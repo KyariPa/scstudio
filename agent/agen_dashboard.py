@@ -187,7 +187,7 @@ def baca_sesi(path):
     if st is None or ukuran < st['offset']:
         st = {'offset': max(0, ukuran - EKOR_AWAL), 'sisa': b'', 'buang_baris': ukuran > EKOR_AWAL,
               'sesi_mulai': ts_awal_file(path), 'akhir': None, 'tools': 0, 'tool_akhir': '', 'detail_akhir': '',
-              'teks_akhir': '', 'menunggu': False, 'judul': '', 'judul_ai': '', 'cwd': '', 'tugas': [], 'model': ''}
+              'teks_akhir': '', 'menunggu': False, 'judul': '', 'judul_ai': '', 'cwd': '', 'tugas': [], 'model': '', 'jejak': []}
         _sesi[path] = st
     if ukuran == st['offset']:
         return st
@@ -247,6 +247,10 @@ def baca_sesi(path):
                             st['tugas'][-1]['tools'] += 1
                         st['tool_akhir'] = nama_tool(x.get('name', ''))
                         st['detail_akhir'] = ringkas_input(x.get('name', ''), x.get('input'))
+                        # jejak kerja terbaru (unik) utk catatan bersama
+                        j_ = f"{st['tool_akhir']}: {st['detail_akhir'][:90]}".strip(': ')
+                        if j_ and (not st['jejak'] or st['jejak'][-1] != j_):
+                            st['jejak'] = (st['jejak'] + [j_])[-6:]
                     elif x.get('type') == 'text' and x.get('text', '').strip():
                         st['teks_akhir'] = ' '.join(x['text'].split())[:600]
     return st
@@ -290,7 +294,7 @@ def kumpulkan_sesi(batas, sekarang):
             'teks_akhir': st['teks_akhir'], 'prompt': tg['teks'] if tg else '', 'laporan': '',
             'tugas_kini': tg['teks'][:300] if tg else '', 'tugas': list(reversed(riwayat))[:15],
             'sesi': sid[:8], 'judul_sesi': judul, 'proyek': st['cwd'], 'sesi_mulai': st['sesi_mulai'],
-            'model': st['model'], 'token_keluar': 0, 'kunci': 'Lead:',
+            'model': st['model'], 'token_keluar': 0, 'kunci': 'Lead:', 'jejak': list(st['jejak']),
         })
     return out
 
@@ -370,7 +374,191 @@ def kumpulkan(jam):
     return {'sekarang': sekarang, 'agen': agen, 'diam_detik': DIAM_DETIK}
 
 
-RINGKAS_BUANG = ('prompt', 'laporan', 'tugas')
+# ═════ QUEST QA (katalog test case) ═════
+# Folder QA berisi TestPlan_<GRUP>.md (ID permanen) + Hasil_<GRUP>_<yyyy-mm-dd[x]>.md (status per putaran).
+# Lokasi folder dari qa.json di samping skrip (lokal, di-gitignore): {"katalog": [{"nama": "...", "folder": "..."}]}
+STATUS_QA = ['PASS', 'FAIL', 'JANGGAL', 'BLOCKED', 'TIDAK BISA DIUJI']
+RE_ID_TC = re.compile(r'^([A-Z]+)-(\d{3})$')
+_qa = {}  # folder -> {'tanda': (nama,mtime,...), 'data': ...}
+
+
+def daftar_katalog():
+    try:
+        j = json.load(open(os.path.join(DIR, 'qa.json'), encoding='utf-8'))
+        return [k for k in j.get('katalog', []) if k.get('folder')]
+    except Exception:
+        return []
+
+
+def sel_md(baris):
+    b = baris.strip().strip('|')
+    return [x.strip().replace('\\|', '|') for x in re.split(r'(?<!\\)\|', b)]
+
+
+def status_qa(teks):
+    t = teks.upper().replace('*', '').strip()
+    for s in STATUS_QA:
+        if re.match(re.escape(s) + r'(?![A-Z])', t):
+            return s
+    return None
+
+
+def baca_qa(folder):
+    files = sorted(glob.glob(os.path.join(folder, 'TestPlan_*.md')) + glob.glob(os.path.join(folder, 'Hasil_*_*.md')))
+    tanda = tuple((os.path.basename(f), os.path.getmtime(f)) for f in files)
+    c = _qa.get(folder)
+    if c and c['tanda'] == tanda:
+        return c['data']
+    tc, urut_grup = {}, []
+    for f in files:
+        nama = os.path.basename(f)
+        if not nama.startswith('TestPlan_'):
+            continue
+        grup, kepala = nama[9:-3], None
+        urut_grup.append(grup)
+        for b in open(f, encoding='utf-8'):
+            if not b.startswith('|'):
+                continue
+            c_ = sel_md(b)
+            if c_ and c_[0] == 'ID':
+                kepala = c_
+                continue
+            if len(c_) < 3 or not RE_ID_TC.match(c_[0]):
+                continue
+            prio = next((x for x in reversed(c_) if re.match(r'^P[123]', x)), '')[:2]
+            rinci = dict(zip(kepala, c_)) if kepala and len(kepala) == len(c_) else {'Isi': ' | '.join(c_[1:])}
+            tc.setdefault(c_[0], {'id': c_[0], 'g': grup, 'f': c_[1], 'k': c_[2], 'p': prio, 's': {}, 'rinci': rinci, 'hasil': {}})
+    putaran = set()
+    for f in files:
+        m = re.match(r'Hasil_([A-Z]+)_(\d{4}-\d{2}-\d{2}[a-z]?)\.md$', os.path.basename(f))
+        if not m:
+            continue
+        tgl = m.group(2)
+        putaran.add(tgl)
+        for b in open(f, encoding='utf-8'):
+            if not b.startswith('| '):
+                continue
+            c_ = sel_md(b)
+            if len(c_) < 3 or not RE_ID_TC.match(c_[0]):
+                continue
+            i = next((k for k, x in enumerate(c_) if k > 1 and status_qa(x)), None)
+            if i is None:
+                continue
+            st = status_qa(c_[i])
+            t = tc.setdefault(c_[0], {'id': c_[0], 'g': m.group(1), 'f': '?', 'k': c_[1], 'p': '', 's': {}, 'rinci': {}, 'hasil': {}})
+            t['s'][tgl] = st
+            t['hasil'][tgl] = {'status': st, 'aktual': c_[i + 1] if len(c_) > i + 1 else '', 'catatan': c_[i + 2] if len(c_) > i + 2 else ''}
+    data = {'putaran': sorted(putaran), 'grup': urut_grup, 'tc': tc}
+    _qa[folder] = {'tanda': tanda, 'data': data}
+    return data
+
+
+def api_qa(k):
+    kat = daftar_katalog()
+    if not kat:
+        return {'katalog': [], 'pesan': 'Belum ada qa.json - lihat qa.contoh.json'}
+    k = max(0, min(k, len(kat) - 1))
+    d = baca_qa(kat[k]['folder'])
+    # status TERKINI = putaran terakhir yg benar2 menguji TC itu (putaran uji ulang sering parsial)
+    def kini(t):
+        for tgl in reversed(d['putaran']):
+            if tgl in t['s']:
+                return t['s'][tgl]
+        return '-'
+    grup = []
+    for g in d['grup']:
+        xs = [t for t in d['tc'].values() if t['g'] == g]
+        hit = {}
+        for t in xs:
+            s = kini(t)
+            hit[s] = hit.get(s, 0) + 1
+        grup.append({'nama': g, 'total': len(xs), 'hitung': hit})
+    # daftar ringkas: status per putaran; teks panjang diambil lewat /api/qa/tc
+    tc = [{'id': t['id'], 'g': t['g'], 'f': t['f'][:40], 'k': t['k'][:140], 'p': t['p'], 's': t['s'], 'kini': kini(t)}
+          for t in d['tc'].values()]
+    return {'katalog': [x.get('nama', x['folder']) for x in kat], 'aktif': k, 'folder': kat[k]['folder'],
+            'putaran': d['putaran'], 'grup': grup, 'tc': tc}
+
+
+def api_qa_tc(k, id_):
+    kat = daftar_katalog()
+    if not kat:
+        return None
+    d = baca_qa(kat[max(0, min(k, len(kat) - 1))]['folder'])
+    t = d['tc'].get(id_)
+    return t and {'id': t['id'], 'g': t['g'], 'f': t['f'], 'k': t['k'], 'p': t['p'], 'rinci': t['rinci'],
+                  'hasil': [{'tgl': tgl, **h} for tgl, h in sorted(t['hasil'].items())]}
+
+
+# ═════ CATATAN BERSAMA ═════
+# Selama server jalan, tiap CATATAN_DETIK ditulis ~/.claude/catatan-bersama.md: poin penting tiap sesi utama aktif
+# (tugas sekarang, arah, jejak kerja, kalimat terakhir, agen yg dijalankan) -> sesi lain tinggal baca supaya paham sama.
+# Bagian manual dibaca dari ~/.claude/catatan-bersama-manual.md (tidak pernah ditimpa).
+CATATAN = os.path.join(os.path.expanduser('~'), '.claude', 'catatan-bersama.md')
+CATATAN_MANUAL = os.path.join(os.path.expanduser('~'), '.claude', 'catatan-bersama-manual.md')
+CATATAN_DETIK = 15
+
+
+def potong(t, n):
+    t = ' '.join((t or '').split())
+    return t if len(t) <= n else t[:n - 1] + '…'
+
+
+def susun_catatan():
+    d = kumpulkan(6)
+    sekarang = d['sekarang']
+    jamf = lambda t: datetime.fromtimestamp(t).strftime('%H:%M') if t else '-'
+    sesi = [a for a in d['agen'] if a['peran'] == 'Lead' and a['status'] != 'selesai']
+    agen = [a for a in d['agen'] if a['peran'] != 'Lead' and a['status'] != 'selesai']
+    out = [f"# Catatan Bersama - update {datetime.fromtimestamp(sekarang).strftime('%d-%m-%Y %H:%M:%S')}",
+           '', 'Ditulis otomatis oleh Dashboard Agen (agen_dashboard.py) tiap '
+           f'{CATATAN_DETIK} dtk selama server jalan. Kalau jam update > 2 menit lalu, server mati -> anggap BASI.',
+           'Isi = poin penting tiap sesi Claude utama yang aktif, supaya sesi lain paham konteksnya. Hanya baca; '
+           'catatan sendiri tulis ke catatan-bersama-manual.md.', '']
+    if not sesi:
+        out.append('_Tidak ada sesi utama yang aktif._')
+    for s in sesi:
+        st_txt = {'jalan': 'sedang kerja', 'menunggu': 'menunggu balasan user', 'diam': 'diam'}.get(s['status'], s['status'])
+        out += [f"## {s['deskripsi']}  (sesi {s['sesi']})",
+                f"- Status: {st_txt} · folder `{s.get('proyek') or '-'}`",
+                f"- Tugas sekarang (sejak {jamf(s['mulai'])}): {potong(s.get('tugas_kini'), 300) or '-'}"]
+        lalu = [t for t in (s.get('tugas') or [])[1:4]]
+        if lalu:
+            out.append('- Arah (tugas sebelumnya, terbaru dulu):')
+            out += [f"  - {jamf(t['mulai'])} {potong(t['teks'], 160)}" for t in lalu]
+        if s.get('jejak'):
+            out.append('- Jejak kerja terakhir: ' + ' → '.join(potong(j, 70) for j in s['jejak'][-4:]))
+        if s.get('teks_akhir'):
+            out.append(f"- Kalimat terakhir sesi: \"{potong(s['teks_akhir'], 280)}\"")
+        anak = [a for a in agen if a['sesi'] == s['sesi']]
+        if anak:
+            out.append('- Agen yang sedang jalan: ' + '; '.join(f"{a['peran']}: {potong(a['deskripsi'], 50)} ({a['status']})" for a in anak))
+        out.append('')
+    try:
+        manual = re.sub(r'<!--.*?-->', '', open(CATATAN_MANUAL, encoding='utf-8').read(), flags=re.S).strip()  # buang komentar petunjuk
+    except OSError:
+        manual = ''
+    out += ['## Catatan manual (dari catatan-bersama-manual.md)', manual or '_kosong_', '']
+    return '\n'.join(out)
+
+
+def penulis_catatan():
+    lama = None
+    while True:
+        try:
+            isi = susun_catatan()
+            badan = isi.split('\n', 1)[1]  # abaikan baris jam: tulis ulang hanya kalau isi berubah atau tiap 60 dtk
+            if badan != lama or int(time.time()) % 60 < CATATAN_DETIK:
+                tmp = CATATAN + '.tmp'
+                open(tmp, 'w', encoding='utf-8').write(isi)
+                os.replace(tmp, CATATAN)
+                lama = badan
+        except Exception as e:
+            print('catatan bersama gagal:', e)
+        time.sleep(CATATAN_DETIK)
+
+
+RINGKAS_BUANG = ('prompt', 'laporan', 'tugas', 'jejak')
 HOST_BOLEH = ('127.0.0.1', 'localhost')
 
 
@@ -406,6 +594,25 @@ class H(BaseHTTPRequestHandler):
         if host not in HOST_BOLEH:
             self.kirim(403, 'text/plain', 'host tidak diizinkan')
             return
+        if self.path.split('?')[0] == '/catatan':
+            try:
+                self.kirim(200, 'text/plain; charset=utf-8', open(CATATAN, encoding='utf-8').read())
+            except OSError:
+                self.kirim(404, 'text/plain; charset=utf-8', 'catatan belum ada')
+            return
+        if self.path.startswith('/api/qa'):
+            mk = re.search(r'[?&]k=(\d+)', self.path)
+            k = int(mk.group(1)) if mk else 0
+            try:
+                if self.path.startswith('/api/qa/tc'):
+                    mi = re.search(r'id=([A-Z]+-\d{3})', self.path)
+                    t = api_qa_tc(k, mi.group(1)) if mi else None
+                    self.kirim(200 if t else 404, 'application/json', json.dumps(t or {'error': 'tidak ada'}))
+                else:
+                    self.kirim(200, 'application/json', json.dumps(api_qa(k)))
+            except Exception as e:
+                self.kirim(500, 'application/json', json.dumps({'error': str(e)}))
+            return
         if self.path.startswith('/api/agen/detail'):
             # detail lengkap satu agen (prompt + laporan) - dipakai halaman desa saat agen dipilih
             m = re.search(r'id=([\w.-]+)', self.path)
@@ -437,4 +644,6 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     print(f'Dashboard agen: http://localhost:{PORT}  (baca {AKAR})')
+    print(f'Catatan bersama: {CATATAN} (tiap {CATATAN_DETIK} dtk)')
+    threading.Thread(target=penulis_catatan, daemon=True).start()
     ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

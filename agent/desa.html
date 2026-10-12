@@ -62,6 +62,24 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
   #kontrol{left:12px;right:12px;flex-wrap:wrap}
   #kontrol .bantu{display:none}
 }
+.tabs{display:flex;gap:6px;margin-top:8px}
+.tab{font:inherit;font-size:12.5px;flex:1;padding:5px 8px;border-radius:7px;border:1px solid var(--garis);background:rgba(255,255,255,.05);color:var(--teks2);cursor:pointer}
+.tab.on{border-color:var(--emas);color:var(--emas);background:rgba(232,184,90,.1)}
+#quest{overflow:auto;padding:6px 8px 10px;flex:1}
+.qkontrol{display:flex;gap:6px;align-items:center;margin:4px 0 8px}.qkontrol select{flex:1}
+#quest select,#qCari{font:inherit;font-size:12.5px;background:rgba(0,0,0,.3);color:var(--teks);border:1px solid var(--garis);border-radius:7px;padding:5px 7px}
+#qCari{width:100%;margin:8px 0 2px}
+.qg{padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent}.qg:hover{background:rgba(255,255,255,.06)}.qg.pilih{border-color:var(--emas)}
+.qgn{display:flex;justify-content:space-between;font-size:12.5px}.qgn span{color:var(--teks3)}
+.qbar{display:flex;height:7px;border-radius:4px;overflow:hidden;margin-top:4px;gap:1px}.qbar i{display:block}
+.qchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.qchip{font:inherit;font-size:11.5px;padding:2px 9px;border-radius:999px;border:1px solid var(--garis);background:none;color:var(--teks2);cursor:pointer}.qchip.on{border-color:var(--emas);color:var(--emas)}
+.qid{font-size:11.5px;font-weight:700;color:var(--teks2);flex:none;font-variant-numeric:tabular-nums}
+.qk{font-size:11.5px;color:var(--teks3);margin-top:8px}.qv{font-size:12.5px;color:var(--teks);white-space:pre-wrap;word-break:break-word}
+.qh{padding:7px 0;border-top:1px solid var(--garis)}
+.qpill{display:inline-block;font-size:11px;font-weight:700;color:#1a1a1a;padding:1px 8px;border-radius:6px}
+.lblSlime{background:rgba(120,20,20,.85);color:#fff;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:5px;pointer-events:none}
+.lblSlime{display:none}.dekat .lblSlime,.lblSlime.on{display:block}
 #galat{z-index:20;position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#7a2020;color:#fff;padding:6px 12px;border-radius:8px;display:none;font-size:13px}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
@@ -69,8 +87,10 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
 <body>
 <div id="dunia"></div>
 <aside id="kiri" class="panel">
-  <header><h1>Desa Agen <a href="/">dashboard</a></h1><div class="ringkas" id="ringkas">memuat...</div></header>
+  <header><h1>Desa Agen <a href="/">dashboard</a></h1><div class="ringkas" id="ringkas">memuat...</div>
+    <div class="tabs"><button class="tab on" data-tab="agen">Agen</button><button class="tab" data-tab="quest">Quest QA</button></div></header>
   <div id="daftar"></div>
+  <div id="quest" style="display:none"></div>
 </aside>
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
@@ -207,11 +227,14 @@ function baraLayang(x, y, z, n=10){
 
 // ── tata letak ──
 const TITIK = { gerbang:V(0,0,64), simpang:V(0,0,14), papan:V(0,0,2.6) };
-const AREA = { Dev:V(-34,0,8), QA:V(34,0,8), Tester:V(-34,0,40), Document:V(34,0,40), Kedai:V(-16,0,53), Guild:V(0,0,2) };
-const RADIUS = { Dev:10, QA:10, Tester:11.5, Document:9.5, Kedai:8.5, Guild:5.5 };
-jalan(0,64,0,0); jalan(0,14,-30,9); jalan(0,14,30,9); jalan(0,30,-28,38); jalan(0,30,28,38); jalan(0,53,-10,53, 3);
+const AREA = { Dev:V(-34,0,8), QA:V(34,0,8), Tester:V(-34,0,40), Document:V(34,0,40), Kedai:V(-16,0,53), Guild:V(0,0,2), Quest:V(0,0,-21) };
+const RADIUS = { Dev:10, QA:10, Tester:11.5, Document:9.5, Kedai:8.5, Guild:5.5, Quest:15 };
+jalan(0,64,0,0); jalan(0,0,0,-12); jalan(0,14,-30,9); jalan(0,14,30,9); jalan(0,30,-28,38); jalan(0,30,28,38); jalan(0,53,-10,53, 3);
 // label area = papan nama di TANAH di depan area (ke arah kamera bawaan) -> tak menimpa label agen di atas kepala
 labelDunia('Balai Guild', 0, 0.3, 8);
+labelDunia('Papan Quest (QA)', 9, 0.3, -9);
+alas(0, -21, 15, 0xbfae8c, 14); alas(0, -14, 7, 0xcdbd9a, 10, 0.04, -6);
+lentera(-16, -12); lentera(16, -12); bendera(-17.5, -19, 0xd8403a); bendera(17.5, -19, 0x3fae5a);
 labelDunia('Pandai Besi (Dev)', -27, 0.3, 15.5);
 labelDunia('Perpustakaan (QA)', 41, 0.3, 15.5);
 labelDunia('Arena Tebas (Tester)', -26.5, 0.3, 48);
@@ -450,6 +473,166 @@ function ambilSlot(peran, id){
   s.pakai = id; return s;
 }
 function lepasSlot(s){ if (s) s.pakai = null; }
+
+// ═════ QUEST QA: papan test case + slime FAIL ═════
+// Data dari /api/qa (folder QA di qa.json). Tiap TC = kertas di papan grupnya, warna = status; FAIL terkini = slime.
+const WARNA_QA = {'PASS':0x3fae5a, 'FAIL':0xd8403a, 'JANGGAL':0xe8b830, 'BLOCKED':0x8a5ad0, 'TIDAK BISA DIUJI':0x9a9a9a, '-':0xeeeae0};
+const NAMA_QA = {'PASS':'PASS', 'FAIL':'FAIL', 'JANGGAL':'JANGGAL', 'BLOCKED':'BLOCKED', 'TIDAK BISA DIUJI':'TBD', '-':'belum'};
+const QC = AREA.Quest, KOLOM = 18, PETAK = 0.28, KANAN_Q = V(Math.cos(Math.PI/4), 0, -Math.sin(Math.PI/4));
+const QUEST = {data:null, tanda:'', papan:[], slime:[], kertasDari:new Map(), putaran:'kini', katalog:0, pilih:null, filterS:'', filterG:'', cari:''};
+const sorot = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.32, 0.03), emisif(0xffffff, 2.2)); sorot.visible = false; scene.add(sorot);
+const statusTC = t => QUEST.putaran === 'kini' ? (t.kini || '-') : (t.s[QUEST.putaran] || '-');
+
+function hapusQuest(){
+  for (const p of QUEST.papan){ scene.remove(p.g); p.lbl.removeFromParent(); p.lbl.element.remove(); }
+  for (const s of QUEST.slime){ scene.remove(s.g); s.lbl.removeFromParent(); s.lbl.element.remove(); }
+  QUEST.papan = []; QUEST.slime = []; QUEST.kertasDari.clear(); sorot.visible = false;
+}
+// halaman di depan barisan papan: u = sepanjang kanan-layar, v = maju/mundur ke arah kamera
+const halamanQuest = (u, v) => QC.clone().addScaledVector(KANAN_Q, u).addScaledVector(ARAH, 5 + v);
+function bangunQuest(){
+  hapusQuest();
+  const d = QUEST.data; if (!d || !d.grup) return;
+  const n = d.grup.length, jarakX = 7.2;
+  d.grup.forEach((G, i) => {
+    const xs = d.tc.filter(t => t.g === G.nama).sort((a,b) => a.id.localeCompare(b.id));
+    const baris = Math.max(1, Math.ceil(xs.length / KOLOM)), W = KOLOM*PETAK + 0.6, H = baris*PETAK + 0.7;
+    // jajar sepanjang sumbu kanan-layar kamera bawaan & menghadap kamera -> tampil berdampingan, tak saling timpa
+    const u = (i - (n-1)/2) * jarakX, mundur = Math.abs(i - (n-1)/2) * 1.2;
+    const g = new THREE.Group(); g.position.copy(QC).addScaledVector(KANAN_Q, u).addScaledVector(ARAH, -2 - mundur);
+    g.rotation.y = HADAP - (i - (n-1)/2) * 0.1; scene.add(g);
+    for (const sx of [-1,1]) silinder(0.14, 0.17, H+1.5, 0x6b4a2e, sx*(W/2+0.1), (H+1.5)/2, 0, 6, g);
+    const papan = kotak(W, H, 0.18, 0x9c7448, 0, 0.9+H/2, 0, g); papan.userData = {papan: G.nama};
+    kotak(W+0.5, 0.14, 0.7, 0x7a3e22, 0, 1.55+H, 0.1, g).rotation.x = -0.25;
+    // kertas TC: 1 InstancedMesh per papan, warna per status; FAIL dilapis kertas menyala (berkedip)
+    const kertas = new THREE.InstancedMesh(new THREE.BoxGeometry(0.22, 0.24, 0.02), new THREE.MeshStandardMaterial({flatShading:true, roughness:.85}), xs.length);
+    const nyala = xs.filter(t => statusTC(t) === 'FAIL');
+    const merah = new THREE.InstancedMesh(new THREE.BoxGeometry(0.23, 0.25, 0.022), emisif(0xff4a3a, 1.2), Math.max(1, nyala.length));
+    merah.count = nyala.length;
+    const dum = new THREE.Object3D(); let iM = 0;
+    xs.forEach((t, k) => {
+      const c = k % KOLOM, r = Math.floor(k / KOLOM);
+      dum.position.set(-W/2 + 0.3 + c*PETAK + PETAK/2, 0.9 + H - 0.35 - r*PETAK - PETAK/2, 0.11); dum.rotation.set(0, 0, ((k*7919) % 11 - 5) * 0.012); dum.updateMatrix();
+      kertas.setMatrixAt(k, dum.matrix); kertas.setColorAt(k, new THREE.Color(WARNA_QA[statusTC(t)] ?? WARNA_QA['-']));
+      QUEST.kertasDari.set(t.id, {g, pos: dum.position.clone(), rot: dum.rotation.z});
+      if (statusTC(t) === 'FAIL'){ dum.position.z = 0.122; dum.updateMatrix(); merah.setMatrixAt(iM++, dum.matrix); }
+    });
+    kertas.userData = {kertas: xs.map(t => t.id)}; kertas.castShadow = true; g.add(kertas); g.add(merah);
+    const hit = G.hitung, akhirPass = hit['PASS'] || 0, f = hit['FAIL'] || 0, j = hit['JANGGAL'] || 0;
+    const div = document.createElement('div'); div.className = 'bangun papanQ';
+    div.innerHTML = `${esc(G.nama)}<br><span style="opacity:.85;font-weight:400">${akhirPass}/${G.total} lulus${f ? ` · <b style="color:#ff8a7a">${f} FAIL</b>` : ''}</span>`; div.style.textAlign = 'center';
+    const lbl = new CSS2DObject(div); lbl.position.set(0, 2.2+H, 0); g.add(lbl);
+    QUEST.papan.push({g, lbl, nama: G.nama, kertas, merah, papan});
+  });
+  // slime = FAIL terkini (P1 lebih besar), melompat-lompat di halaman papan
+  d.tc.filter(t => (t.kini || '-') === 'FAIL').forEach((t, i) => {
+    const s = t.p === 'P1' ? 1.35 : 1, g = new THREE.Group(); scene.add(g);
+    const badan = bola(0.5*s, 0xd8403a, 0, 0.42*s, 0, g, 1); badan.scale.set(1, 0.75, 1); badan.material = new THREE.MeshStandardMaterial({color:0xd8403a, flatShading:true, roughness:.35, transparent:true, opacity:.92});
+    for (const sx of [-1,1]){ bola(0.1*s, 0xffffff, sx*0.17*s, 0.55*s, 0.36*s, g); bola(0.05*s, 0x1d1b1a, sx*0.17*s, 0.55*s, 0.44*s, g); }
+    const alis = kotak(0.42*s, 0.05*s, 0.05, 0x5a1010, 0, 0.72*s, 0.38*s, g); alis.rotation.z = 0.15;
+    badan.userData = {tc: t.id}; g.children.forEach(m => m.userData = {tc: t.id});
+    const a = i * 2.39996, r = 4 + (i % 5) * 1.5;
+    g.position.copy(halamanQuest(Math.cos(a)*r*1.2, Math.sin(a)*3));
+    const div = document.createElement('div'); div.className = 'lblSlime'; div.textContent = t.id;
+    const lbl = new CSS2DObject(div); lbl.position.set(0, 1.25*s, 0); g.add(lbl);
+    QUEST.slime.push({g, badan, s, lbl, id: t.id, tujuan: g.position.clone(), fase: acak()*6, tunggu: acak()*2});
+  });
+  if (QUEST.pilih) soroti(QUEST.pilih, false);
+}
+HIDUP.push((t, dt) => {
+  for (const p of QUEST.papan) p.merah.material.emissiveIntensity = 0.9 + Math.sin(t*4)*0.6;
+  for (const s of QUEST.slime){
+    const g = s.g, d = V(s.tujuan.x - g.position.x, 0, s.tujuan.z - g.position.z), L = d.length();
+    if (L < 0.2){ s.tunggu -= dt; if (s.tunggu <= 0){ const a = acak()*Math.PI*2, r = 2 + acak()*9; s.tujuan.copy(halamanQuest((acak()-.5)*28, (acak()-.5)*7)); s.tunggu = 1 + acak()*2.5; } }
+    else { g.position.addScaledVector(d, Math.min(1, 1.6*dt/L)); g.rotation.y = Math.atan2(d.x, d.z); }
+    const lompat = L >= 0.2 ? Math.abs(Math.sin(t*5 + s.fase)) : Math.abs(Math.sin(t*2 + s.fase))*0.15;
+    g.position.y = lompat * 0.6 * s.s; s.badan.scale.set(1 + (1-lompat)*0.18, 0.75 - (1-lompat)*0.15 + lompat*0.1, 1 + (1-lompat)*0.18);
+  }
+  if (sorot.visible) sorot.material.emissiveIntensity = 1.6 + Math.sin(t*6)*0.8;
+});
+function soroti(id, terbang = true){
+  for (const sl of QUEST.slime) sl.lbl.element.classList.toggle('on', sl.id === id); // label slime terpilih selalu tampil
+  const k = QUEST.kertasDari.get(id); if (!k){ sorot.visible = false; return; }
+  sorot.visible = true; k.g.add(sorot); sorot.position.copy(k.pos); sorot.position.z = 0.1; sorot.rotation.z = k.rot;
+  if (terbang){ const w = new THREE.Vector3(); k.g.localToWorld(w.copy(k.pos)); kam.fokus = null; kam.fokusPos = V(w.x, 0, w.z + 3); kam.zoomTuju = Math.max(kam.zoomTuju, 2.2); }
+}
+async function ambilQuest(){
+  try {
+    const r = await fetch('/api/qa?k=' + QUEST.katalog, {cache:'no-store'}); const j = await r.json();
+    const tanda = JSON.stringify([j.aktif, j.putaran, j.tc?.map(t => t.id + (t.kini||'') + JSON.stringify(t.s))]);
+    QUEST.data = j;
+    if (tanda !== QUEST.tanda){ QUEST.tanda = tanda; bangunQuest(); }
+    if (TAB === 'quest') gambarQuest();
+  } catch (e) { /* server lama tanpa /api/qa: abaikan */ }
+}
+
+// ── panel Quest (tab kiri) ──
+let TAB = 'agen';
+function gambarQuest(){
+  const d = QUEST.data, Q = $('quest');
+  if (!d){ Q.innerHTML = '<div class="grp">memuat...</div>'; return; }
+  if (!d.katalog || !d.katalog.length){ Q.innerHTML = `<div style="font-size:12.5px;color:var(--teks3);padding:8px">${esc(d.pesan || 'Belum ada katalog QA.')}</div>`; return; }
+  const fokus = document.activeElement && document.activeElement.id === 'qCari';
+  const st = QUEST.putaran;
+  const grupHtml = d.grup.map(G => {
+    const xs = d.tc.filter(t => t.g === G.nama), hit = {}; xs.forEach(t => { const s = statusTC(t); hit[s] = (hit[s]||0)+1; });
+    const seg = ['PASS','JANGGAL','BLOCKED','TIDAK BISA DIUJI','FAIL','-'].filter(s => hit[s]).map(s => `<i style="flex:${hit[s]};background:#${(WARNA_QA[s]).toString(16).padStart(6,'0')}" title="${NAMA_QA[s]} ${hit[s]}"></i>`).join('');
+    return `<div class="qg${QUEST.filterG===G.nama?' pilih':''}" data-g="${esc(G.nama)}"><div class="qgn"><b>${esc(G.nama)}</b><span>${hit['PASS']||0}/${G.total}${hit['FAIL']?` · <b style="color:#ff8a7a">${hit['FAIL']} FAIL</b>`:''}</span></div><div class="qbar">${seg}</div></div>`;
+  }).join('');
+  const chip = (s, label) => `<button class="qchip${QUEST.filterS===s?' on':''}" data-s="${s}">${label}</button>`;
+  const cari = QUEST.cari.toLowerCase();
+  const xs = d.tc.filter(t => (!QUEST.filterG || t.g === QUEST.filterG) && (!QUEST.filterS || statusTC(t) === QUEST.filterS) &&
+    (!cari || (t.id + ' ' + t.f + ' ' + t.k).toLowerCase().includes(cari)))
+    .sort((a,b) => (statusTC(a)==='FAIL'?0:1) - (statusTC(b)==='FAIL'?0:1) || a.id.localeCompare(b.id));
+  const MAKS = 250;
+  Q.innerHTML = `<div class="qkontrol">
+      ${d.katalog.length > 1 ? `<select id="qKat">${d.katalog.map((k,i) => `<option value="${i}"${i===d.aktif?' selected':''}>${esc(k)}</option>`).join('')}</select>` : `<div class="grp" style="margin:4px 2px">${esc(d.katalog[0])}</div>`}
+      <select id="qPut"><option value="kini"${st==='kini'?' selected':''}>Status terkini</option>${d.putaran.map(p => `<option value="${p}"${st===p?' selected':''}>Putaran ${p}</option>`).join('')}</select>
+    </div>${grupHtml}
+    <div class="qchips">${chip('','Semua')}${chip('FAIL','FAIL')}${chip('JANGGAL','Janggal')}${chip('BLOCKED','Blocked')}${chip('TIDAK BISA DIUJI','TBD')}${chip('PASS','Pass')}${chip('-','Belum')}</div>
+    <input id="qCari" placeholder="Cari ID / fitur / test case" value="${esc(QUEST.cari)}">
+    <div class="grp">${xs.length} test case${xs.length > MAKS ? ` (tampil ${MAKS})` : ''}</div>
+    ${xs.slice(0, MAKS).map(t => { const s = statusTC(t); return `<div class="item qt${QUEST.pilih===t.id?' pilih':''}" data-tc="${t.id}"><span class="dot" style="background:#${WARNA_QA[s].toString(16).padStart(6,'0')}"></span><span class="qid">${t.id}</span><span class="nm">${esc(t.k)}</span>${t.p?`<span class="wkt">${t.p}</span>`:''}</div>`; }).join('')}`;
+  if (fokus){ const c = $('qCari'); c.focus(); c.setSelectionRange(c.value.length, c.value.length); }
+}
+$('quest').addEventListener('click', e => {
+  const g = e.target.closest('.qg'), c = e.target.closest('.qchip'), it = e.target.closest('.qt');
+  if (g){ QUEST.filterG = QUEST.filterG === g.dataset.g ? '' : g.dataset.g; const p = QUEST.papan.find(x => x.nama === g.dataset.g);
+    if (p && QUEST.filterG){ kam.fokus = null; kam.fokusPos = V(p.g.position.x, 0, p.g.position.z + 4); kam.zoomTuju = Math.max(kam.zoomTuju, 1.5); } gambarQuest(); }
+  if (c){ QUEST.filterS = c.dataset.s; gambarQuest(); }
+  if (it) pilihTC(it.dataset.tc);
+});
+$('quest').addEventListener('change', e => {
+  if (e.target.id === 'qPut'){ QUEST.putaran = e.target.value; bangunQuest(); gambarQuest(); }
+  if (e.target.id === 'qKat'){ QUEST.katalog = +e.target.value; QUEST.tanda = ''; QUEST.filterG = ''; ambilQuest(); }
+});
+$('quest').addEventListener('input', e => { if (e.target.id === 'qCari'){ QUEST.cari = e.target.value; gambarQuest(); } });
+function gantiTab(t){
+  TAB = t; document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('daftar').style.display = t === 'agen' ? '' : 'none'; $('quest').style.display = t === 'quest' ? '' : 'none';
+  if (t === 'quest'){ gambarQuest(); if (!QUEST.pilih){ kam.fokus = null; kam.fokusPos = halamanQuest(0, -3); kam.zoomTuju = 1.05; } }
+}
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => gantiTab(b.dataset.tab));
+
+// ── detail TC (panel kanan) ──
+async function pilihTC(id, terbang = true){
+  QUEST.pilih = id; pilihId = null; for (const o of AGEN.values()){ o.s.cincin.visible = false; }
+  soroti(id, terbang); if (TAB !== 'quest') gantiTab('quest'); else gambarQuest();
+  $('kanan').style.display = 'block'; $('detail').innerHTML = `<h2>${esc(id)}</h2><div class="grp">memuat...</div>`;
+  try {
+    const t = await (await fetch(`/api/qa/tc?k=${QUEST.katalog}&id=${encodeURIComponent(id)}`, {cache:'no-store'})).json();
+    if (QUEST.pilih !== id) return;
+    const pill = s => `<span class="qpill" style="background:#${(WARNA_QA[s]??WARNA_QA['-']).toString(16).padStart(6,'0')}">${NAMA_QA[s]||s}</span>`;
+    const rinci = Object.entries(t.rinci || {}).filter(([k]) => !['ID','Fitur','Test case','Prioritas'].includes(k))
+      .map(([k,v]) => `<div class="qk">${esc(k)}</div><div class="qv">${esc(v)}</div>`).join('');
+    const hasil = (t.hasil || []).map(h => `<div class="qh"><div>${pill(h.status)} <span style="color:var(--teks3);font-size:12px">putaran ${esc(h.tgl)}</span></div>
+      ${h.aktual?`<div class="qv">${esc(h.aktual)}</div>`:''}${h.catatan && h.catatan !== '-' ? `<div class="qv" style="color:var(--teks2)">Catatan: ${esc(h.catatan)}</div>`:''}</div>`).join('');
+    $('detail').innerHTML = `<span class="peran p-QA">Quest</span> <span style="font-size:11px;color:var(--teks3)">${esc(t.g)} · ${esc(t.f)}${t.p?' · '+esc(t.p):''}</span>
+      <h2>${esc(t.id)}: ${esc(t.k)}</h2>
+      <div style="margin:6px 0 10px;display:flex;gap:6px;flex-wrap:wrap">${(t.hasil||[]).map(h => pill(h.status) + `<span style="font-size:11px;color:var(--teks3);align-self:center">${esc(h.tgl)}</span>`).join(' ') || pill('-')}</div>
+      ${rinci}<div class="grp" style="margin-top:12px">Hasil per putaran</div>${hasil || '<div class="qv">Belum diuji.</div>'}`;
+  } catch (e) { $('detail').innerHTML = `<h2>${esc(id)}</h2><div class="qv">Gagal memuat detail.</div>`; }
+}
 
 // ═════ KARAKTER CHIBI RPG (low-poly) ═════
 // Kerangka sama dgn stickman lama (pinggul y0.95, bahu +0.68, lengan 0.72, kaki 0.95) -> semua animasi tetap berlaku.
@@ -839,7 +1022,7 @@ function detailDari(a){
   return DETAIL.get(a.id) || {};
 }
 function gambarDetail(){
-  if (!pilihId){ $('kanan').style.display='none'; return; }
+  if (!pilihId){ if (!QUEST.pilih) $('kanan').style.display='none'; return; }
   const a0 = semuaAgen().find(x => x.id===pilihId); if (!a0){ $('kanan').style.display='none'; return; }
   const dd = detailDari(a0), a = {...a0, prompt: a0.prompt ?? dd.prompt ?? 'memuat...', laporan: a0.laporan ?? dd.laporan ?? ''};
   const now = Date.now()/1000 + selisih, lama = a.status==='jalan' ? now-a.mulai : a.durasi;
@@ -880,14 +1063,14 @@ function gambarDetailLead(a, dd, lama, akt){
     <details ${buka('Riwayat tugas')}><summary>Riwayat tugas</summary>${riwayat || '<div style="font-size:12px;color:var(--teks3)">memuat...</div>'}</details>`;
 }
 function pilih(id, terbang=true){
-  pilihId = id;
+  pilihId = id; QUEST.pilih = null; sorot.visible = false; kam.fokusPos = null;
   for (const o of AGEN.values()){ o.s.cincin.visible = o.id===id; tulisLabel(o); }
   const o = AGEN.get(id);
   if (o && terbang){ kam.fokus = o; kam.zoomTuju = Math.max(kam.zoomTuju, 1.8); }
   gambarDaftar(); gambarDetail();
 }
 $('daftar').addEventListener('click', e => { const it = e.target.closest('.item'); if (it) pilih(it.dataset.id); });
-$('kanan').querySelector('.tutup').onclick = () => { pilihId = null; for (const o of AGEN.values()){ o.s.cincin.visible=false; tulisLabel(o); } gambarDetail(); gambarDaftar(); };
+$('kanan').querySelector('.tutup').onclick = () => { pilihId = null; QUEST.pilih = null; sorot.visible = false; if (TAB === 'quest') gambarQuest(); for (const o of AGEN.values()){ o.s.cincin.visible=false; tulisLabel(o); } gambarDetail(); gambarDaftar(); };
 
 // ═════ KONTROL KAMERA ═════
 const el = renderer.domElement;
@@ -895,12 +1078,13 @@ let seret = null;
 el.addEventListener('pointerdown', e => { seret = {x:e.clientX, y:e.clientY, x0:e.clientX, y0:e.clientY}; el.setPointerCapture(e.pointerId); });
 el.addEventListener('pointermove', e => {
   if (!seret) return; const dx = e.clientX-seret.x, dy = e.clientY-seret.y; seret.x = e.clientX; seret.y = e.clientY;
-  if (Math.hypot(e.clientX-seret.x0, e.clientY-seret.y0) > 4) kam.fokus = null;
+  if (Math.hypot(e.clientX-seret.x0, e.clientY-seret.y0) > 4){ kam.fokus = null; kam.fokusPos = null; }
   geser(dx, dy);
 });
 el.addEventListener('pointerup', e => {
   const klik = seret && Math.hypot(e.clientX-seret.x0, e.clientY-seret.y0) < 5; seret = null;
-  if (klik){ const id = pick(e.clientX, e.clientY); if (id) pilih(id, true); }
+  if (klik){ const h = pick(e.clientX, e.clientY);
+    if (h?.agen) pilih(h.agen, true); else if (h?.tc) pilihTC(h.tc, false); else if (h?.papan){ gantiTab('quest'); QUEST.filterG = h.papan; gambarQuest(); } }
 });
 el.addEventListener('wheel', e => { e.preventDefault(); kam.zoomTuju = Math.min(3.2, Math.max(0.4, kam.zoomTuju*Math.exp(-e.deltaY*0.0012))); }, {passive:false});
 function geser(dx, dy){
@@ -919,7 +1103,16 @@ $('bLabel').onclick = e => { gelembung = !gelembung; e.target.classList.toggle('
 $('bDemo').onclick = e => { demo = !demo; e.target.classList.toggle('on', demo); if (demo) buatDemo(); else DEMO = []; sinkron(); gambarDaftar(); };
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
 function pick(x, y){ ndc.set(x/innerWidth*2-1, -(y/innerHeight)*2+1); ray.setFromCamera(ndc, camera);
-  const hs = ray.intersectObjects([...AGEN.values()].map(o=>o.s.hit), false); return hs.length ? hs[0].object.userData.id : null; }
+  const target = [...AGEN.values()].map(o=>o.s.hit);
+  for (const sl of QUEST.slime) target.push(...sl.g.children.filter(m => m.isMesh));
+  for (const p of QUEST.papan) target.push(p.kertas, p.papan);
+  const hs = ray.intersectObjects(target, false); if (!hs.length) return null;
+  const h = hs[0], u = h.object.userData;
+  if (u.id) return {agen: u.id};
+  if (u.tc) return {tc: u.tc};
+  if (u.kertas && h.instanceId != null) return {tc: u.kertas[h.instanceId]};
+  if (u.papan) return {papan: u.papan};
+  return null; }
 
 // ═════ LOOP ═════
 const jamDunia = new THREE.Clock();
@@ -931,8 +1124,9 @@ function loop(){
   if (tombol.has('w')) geser(0, sp/((VIEW/kam.zoom)/innerHeight)*Math.sin(kam.el)); if (tombol.has('s')) geser(0, -sp/((VIEW/kam.zoom)/innerHeight)*Math.sin(kam.el));
   if (tombol.has('a')) geser(sp/((VIEW/kam.zoom)/innerHeight), 0); if (tombol.has('d')) geser(-sp/((VIEW/kam.zoom)/innerHeight), 0);
   if (kam.fokus){ const p = kam.fokus.s.g.position; kam.target.lerp(V(p.x,0,p.z), Math.min(1, dt*4)); }
+  else if (kam.fokusPos){ kam.target.lerp(kam.fokusPos, Math.min(1, dt*4)); if (kam.target.distanceTo(kam.fokusPos) < 0.05) kam.fokusPos = null; }
   kam.az += (kam.azTuju-kam.az)*Math.min(1, dt*7); kam.zoom += (kam.zoomTuju-kam.zoom)*Math.min(1, dt*8);
-  labelR.domElement.classList.toggle('jauh', kam.zoom < 0.85);
+  labelR.domElement.classList.toggle('jauh', kam.zoom < 0.85); labelR.domElement.classList.toggle('dekat', kam.zoom > 1.5);
   aturKamera();
   // agen
   for (const o of [...AGEN.values()]){ if (!o.data) continue; langkah(o, dt); pose(o, dt); if (o.hapus){ if (kam.fokus===o) kam.fokus=null; hapusAgenDunia(o); } }
@@ -945,7 +1139,7 @@ function loop(){
   detikUI += dt; if (detikUI > 1){ detikUI = 0; gambarDaftar(); if (pilihId) gambarDetail(); for (const o of AGEN.values()) if (o.data && o.data.status==='jalan') tulisLabel(o); }
   requestAnimationFrame(loop);
 }
-ukuran(); ambil(); setInterval(ambil, POLL_MS); loop();
+ukuran(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
 </script>
 </body>
 </html>
