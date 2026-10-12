@@ -196,7 +196,7 @@ def kumpulkan(jam):
                 'sesi': os.path.basename(dir_sesi)[:8], 'judul_sesi': judul_sesi(dir_sesi),
                 'model': st['model'], 'token_keluar': st['token_keluar'], 'kunci': peran + ':' + kunci_jenis(desk),
             })
-    # estimasi: rata-rata durasi agen selesai dgn 2 kata awal deskripsi sama; cadangan median semua yg selesai
+    # estimasi: rata-rata durasi agen selesai dgn peran + kata pertama deskripsi sama; cadangan median semua yg selesai
     selesai = [a for a in agen if a['status'] == 'selesai']
     per = {}
     for a in selesai:
@@ -220,6 +220,7 @@ def kumpulkan(jam):
 
 
 RINGKAS_BUANG = ('prompt', 'laporan')
+HOST_BOLEH = ('127.0.0.1', 'localhost')
 
 
 class H(BaseHTTPRequestHandler):
@@ -249,6 +250,11 @@ class H(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def do_GET(self):
+        # tolak Host asing: cegah DNS rebinding (situs lain membaca /api/agen lewat nama domainnya yg diarahkan ke 127.0.0.1)
+        host = (self.headers.get('Host') or '').rsplit(':', 1)[0].lower()
+        if host not in HOST_BOLEH:
+            self.kirim(403, 'text/plain', 'host tidak diizinkan')
+            return
         if self.path.startswith('/api/agen/detail'):
             # detail lengkap satu agen (prompt + laporan) - dipakai halaman desa saat agen dipilih
             m = re.search(r'id=([\w.-]+)', self.path)

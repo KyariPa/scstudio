@@ -5,7 +5,7 @@ Pantau subagen Claude Code yang sedang jalan, secara live, dari browser. Ada dua
 - **Dashboard** (`/`): tabel agen yang jalan, diam, dan selesai. Isinya peran, durasi, estimasi, tool terakhir, laporan, dan tugas lengkap.
 - **Desa Agen** (`/desa`): desa RPG 3D low-poly dengan kamera miring ala Ragnarok atau Harvest Moon. Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya. Gerakannya mengikuti tool yang sedang ia pakai, jadi agen yang sedang mengedit kode terlihat menempa di landasan.
 
-Server cuma membaca file. Ia tidak mengubah apa pun, dan hanya mendengar di `127.0.0.1`.
+Server cuma membaca file. Ia tidak mengubah apa pun, dan hanya mendengar di `127.0.0.1`. Request dengan header `Host` selain `localhost` atau `127.0.0.1` ditolak (403), supaya situs lain tidak bisa membaca data agen lewat DNS rebinding. Akibatnya, dashboard hanya bisa dibuka lewat http://localhost:8790 atau http://127.0.0.1:8790.
 
 ## Menjalankan
 

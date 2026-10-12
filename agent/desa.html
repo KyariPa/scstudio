@@ -189,7 +189,7 @@ for (const [x,z] of [[-14,18],[16,18],[-18,-18],[18,-20],[-50,14],[50,14],[12,48
 for (let i=0;i<30;i++){ const a=acak()*Math.PI*2, r=20+acak()*55; batu(Math.cos(a)*r, Math.sin(a)*r, 0.5+acak()); }
 
 // ═════ STASIUN KERJA (slot) ═════
-// agen berdiri di belakang properti, menghadap kamera bawaan (arah +x+z), properti 1.1 di depannya
+// HADAP = arah kamera bawaan (+x+z); posisi agen di samping properti diatur di buatStasiun()
 const HADAP = Math.PI/4, ARAH = V(Math.sin(HADAP),0,Math.cos(HADAP));
 function landasan(p){ kotak(0.9,0.5,0.6,0x3d3d42,p.x,0.25,p.z); kotak(1.4,0.35,0.55,0x55555c,p.x,0.68,p.z); }
 function boneka(p){ const g=new THREE.Group(); g.position.copy(p); scene.add(g);
@@ -208,7 +208,7 @@ function buatStasiun(props, pembangun, ekstra={}){
 const STASIUN = {
   Dev:      {nama:'Pandai Besi', slot: buatStasiun(grid(-36,8,6,3,4.2), landasan)},
   QA:       {nama:'Perpustakaan', slot: buatStasiun(grid(28,8,6,3,4.2), mimbar)},
-  Tester:   {nama:'Barak Latihan', slot: buatStasiun(grid(-42,36,6,3,4.4), boneka)},
+  Tester:   {nama:'Arena Tebas', slot: buatStasiun(grid(-42,36,6,3,4.4), boneka)},
   Document: {nama:'Juru Tulis', slot: buatStasiun(grid(28,36,6,3,4.2), meja)},
 };
 // kedai: meja + bangku, duduk menghadap meja
