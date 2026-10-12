@@ -24,7 +24,7 @@ def ts(s):
 def ringkas_input(nama, inp):
     if not isinstance(inp, dict):
         return ''
-    for k in ('description', 'file_path', 'pattern', 'command', 'query', 'prompt', 'url', 'code'):
+    for k in ('description', 'action_summary', 'file_path', 'pattern', 'command', 'query', 'prompt', 'url', 'code', 'text', 'action', 'name', 'skill'):
         v = inp.get(k)
         if isinstance(v, str) and v.strip():
             v = ' '.join(v.split())
@@ -149,6 +149,152 @@ def kunci_jenis(desk):
     return w[0].lower() if w else ''
 
 
+# ═════ SESI UTAMA (pekerjaan langsung tanpa agen) ═════
+# Transkrip sesi utama = ~/.claude/projects/<proyek>/<sesi>.jsonl, bisa ratusan MB -> baca EKOR saja (EKOR_AWAL)
+# lalu inkremental. Tiap prompt asli user = satu "tugas". Status: jalan / menunggu (giliran user) / diam / selesai (lama sepi).
+EKOR_AWAL = 8 * 1024 * 1024
+SESI_PULANG_MENIT = 30
+_sesi = {}
+AWALAN_BUKAN_PROMPT = ('This session is being continued', 'Another Claude session', '[Request interrupted', 'Caveat:')
+
+
+def teks_isi(c):
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        return ' '.join(x.get('text', '') for x in c if isinstance(x, dict) and x.get('type') == 'text')
+    return ''
+
+
+def ts_awal_file(path):
+    try:
+        with open(path, 'rb') as f:
+            for b in f.read(256 * 1024).split(b'\n')[:400]:
+                try:
+                    t = json.loads(b).get('timestamp')
+                except Exception:
+                    continue
+                if t:
+                    return ts(t)
+    except OSError:
+        pass
+    return None
+
+
+def baca_sesi(path):
+    ukuran = os.path.getsize(path)
+    st = _sesi.get(path)
+    if st is None or ukuran < st['offset']:
+        st = {'offset': max(0, ukuran - EKOR_AWAL), 'sisa': b'', 'buang_baris': ukuran > EKOR_AWAL,
+              'sesi_mulai': ts_awal_file(path), 'akhir': None, 'tools': 0, 'tool_akhir': '', 'detail_akhir': '',
+              'teks_akhir': '', 'menunggu': False, 'judul': '', 'judul_ai': '', 'cwd': '', 'tugas': [], 'model': ''}
+        _sesi[path] = st
+    if ukuran == st['offset']:
+        return st
+    with open(path, 'rb') as f:
+        f.seek(st['offset'])
+        data = st['sisa'] + f.read()
+        st['offset'] = ukuran
+    baris = data.split(b'\n')
+    st['sisa'] = baris.pop()
+    if st['buang_baris'] and baris:  # mulai baca di tengah file: baris pertama terpotong
+        baris.pop(0)
+        st['buang_baris'] = False
+    for b in baris:
+        if not b.strip():
+            continue
+        try:
+            j = json.loads(b)
+        except Exception:
+            continue
+        tp = j.get('type')
+        if tp == 'custom-title':
+            st['judul'] = j.get('customTitle') or st['judul']
+            continue
+        if tp == 'ai-title':
+            st['judul_ai'] = j.get('aiTitle') or st['judul_ai']
+            continue
+        if j.get('isSidechain'):
+            continue
+        t = ts(j['timestamp']) if j.get('timestamp') else None
+        if t:
+            st['akhir'] = t
+        if j.get('cwd'):
+            st['cwd'] = j['cwd']
+        m = j.get('message') or {}
+        c = m.get('content')
+        if tp == 'user':
+            st['menunggu'] = False
+            if isinstance(c, list) and any(isinstance(x, dict) and x.get('type') == 'tool_result' for x in c):
+                continue
+            teks = teks_isi(c).strip()
+            if not teks or j.get('isMeta') or j.get('isCompactSummary') or teks.startswith('<') or teks.startswith(AWALAN_BUKAN_PROMPT):
+                continue
+            teks = re.sub(r'<pasted_content[^>]*>.*?</pasted_content[^>]*>', '[tempelan]', teks, flags=re.S).strip()
+            st['tugas'].append({'teks': teks[:800], 'mulai': t, 'tools': 0})
+            st['tugas'] = st['tugas'][-30:]
+        elif tp == 'assistant':
+            if m.get('model'):
+                st['model'] = m['model']
+            st['menunggu'] = m.get('stop_reason') == 'end_turn'
+            if isinstance(c, list):
+                for x in c:
+                    if not isinstance(x, dict):
+                        continue
+                    if x.get('type') == 'tool_use':
+                        st['tools'] += 1
+                        if st['tugas']:
+                            st['tugas'][-1]['tools'] += 1
+                        st['tool_akhir'] = nama_tool(x.get('name', ''))
+                        st['detail_akhir'] = ringkas_input(x.get('name', ''), x.get('input'))
+                    elif x.get('type') == 'text' and x.get('text', '').strip():
+                        st['teks_akhir'] = ' '.join(x['text'].split())[:600]
+    return st
+
+
+def kumpulkan_sesi(batas, sekarang):
+    out = []
+    for path in glob.glob(os.path.join(AKAR, '*', '*.jsonl')):
+        try:
+            mt = os.path.getmtime(path)
+        except OSError:
+            continue
+        if mt < batas:
+            continue
+        try:
+            st = baca_sesi(path)
+        except Exception:
+            continue
+        sid = os.path.basename(path)[:-6]
+        akhir = st['akhir'] or mt
+        idle = sekarang - max(akhir, mt)
+        if idle > SESI_PULANG_MENIT * 60:
+            status = 'selesai'
+        elif st['menunggu']:
+            status = 'menunggu'
+        elif idle > DIAM_DETIK:
+            status = 'diam'
+        else:
+            status = 'jalan'
+        tg = st['tugas'][-1] if st['tugas'] else None
+        mulai = (tg and tg['mulai']) or st['sesi_mulai'] or mt   # durasi = tugas yg sedang dikerjakan
+        judul = st['judul'] or st['judul_ai'] or (tg['teks'][:50] if tg else sid[:8])
+        riwayat = []
+        for i, x in enumerate(st['tugas']):
+            berikut = st['tugas'][i + 1]['mulai'] if i + 1 < len(st['tugas']) else akhir
+            riwayat.append({'teks': x['teks'][:240], 'mulai': x['mulai'], 'durasi': (berikut or akhir) - (x['mulai'] or akhir), 'tools': x['tools']})
+        out.append({
+            'id': 'sesi-' + sid, 'deskripsi': judul, 'peran': 'Lead', 'peran_tebakan': False, 'jenis': 'sesi', 'status': status,
+            'mulai': mulai, 'akhir': akhir, 'durasi': (akhir if status != 'jalan' else sekarang) - mulai, 'idle': idle,
+            'tools': tg['tools'] if tg else 0, 'tool_akhir': st['tool_akhir'], 'detail_akhir': st['detail_akhir'],
+            'teks_akhir': st['teks_akhir'], 'prompt': tg['teks'] if tg else '', 'laporan': '',
+            'tugas_kini': tg['teks'][:300] if tg else '', 'tugas': list(reversed(riwayat))[:15],
+            'sesi': sid[:8], 'judul_sesi': judul, 'proyek': st['cwd'], 'sesi_mulai': st['sesi_mulai'],
+            'model': st['model'], 'token_keluar': 0, 'kunci': 'Lead:',
+        })
+    return out
+
+
 def kumpulkan(jam):
     batas = time.time() - jam * 3600
     hasil = []
@@ -196,7 +342,9 @@ def kumpulkan(jam):
                 'sesi': os.path.basename(dir_sesi)[:8], 'judul_sesi': judul_sesi(dir_sesi),
                 'model': st['model'], 'token_keluar': st['token_keluar'], 'kunci': peran + ':' + kunci_jenis(desk),
             })
-    # estimasi: rata-rata durasi agen selesai dgn peran + kata pertama deskripsi sama; cadangan median semua yg selesai
+        sesi = kumpulkan_sesi(batas, sekarang)
+    # estimasi: rata-rata durasi agen selesai dgn peran + kata pertama deskripsi sama; cadangan per peran -> median.
+    # Sesi utama (Lead) tak diestimasi.
     selesai = [a for a in agen if a['status'] == 'selesai']
     per = {}
     for a in selesai:
@@ -215,11 +363,14 @@ def kumpulkan(jam):
             a['estimasi'], a['dasar_estimasi'] = sum(xs) / len(xs), f"{dasar} ({len(xs)})"
         else:
             a['estimasi'], a['dasar_estimasi'] = median, ('median semua agen selesai' if median else '')
-    agen.sort(key=lambda a: ({'jalan': 0, 'diam': 1, 'selesai': 2}[a['status']], -a['mulai']))
+    for s in sesi:
+        s['estimasi'], s['dasar_estimasi'] = None, ''
+    agen += sesi
+    agen.sort(key=lambda a: ({'jalan': 0, 'menunggu': 1, 'diam': 2, 'selesai': 3}[a['status']], -a['mulai']))
     return {'sekarang': sekarang, 'agen': agen, 'diam_detik': DIAM_DETIK}
 
 
-RINGKAS_BUANG = ('prompt', 'laporan')
+RINGKAS_BUANG = ('prompt', 'laporan', 'tugas')
 HOST_BOLEH = ('127.0.0.1', 'localhost')
 
 
