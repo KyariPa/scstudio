@@ -72,6 +72,7 @@ tr.klik{cursor:pointer} tr.klik:hover td{background:var(--bg)}
       <input id="cari" placeholder="Cari agen..." aria-label="Cari">
     </div>
   </div>
+  <div id="peringatan" style="display:none;background:var(--diam-bg);color:var(--diam);border:1px solid var(--garis);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:14px"></div>
   <div class="kpi">
     <div><b id="kJalan">-</b><span>Sedang jalan</span></div>
     <div><b id="kDiam">-</b><span>Diam / menunggu</span></div>
@@ -130,6 +131,8 @@ function gambar(){
   $('kDiam').textContent=xs.filter(a=>a.status==='diam'||a.status==='menunggu').length;
   $('kSelesai').textContent=sel.length;
   $('kWaktu').textContent=dur(xs.reduce((s,a)=>s+(a.status==='jalan'?now-a.mulai:a.durasi),0));
+  // peringatan sumber data (folder transkrip tak ada / belum ada transkrip)
+  $('peringatan').style.display=DATA.peringatan?'block':'none'; $('peringatan').textContent=DATA.peringatan||'';
   $('info').textContent=`Dibaca langsung dari transkrip agen · diperbarui ${jam(DATA.sekarang)} · "diam" = belum lapor & tak ada aktivitas > ${DATA.diam_detik} dtk`;
   $('aktif').innerHTML=akt.length?akt.map(a=>kartuAktif(a,now)).join(''):'<div class="kosong">Tidak ada agen yang sedang jalan.</div>';
   $('selesai').innerHTML=sel.length?`<table><tr><th>Agen</th><th class="sembunyi-hp">Sesi</th><th>Mulai</th><th style="text-align:right">Durasi</th><th style="text-align:right">Aksi</th></tr>

@@ -1000,7 +1000,9 @@ function gambarDaftar(){
   for (const a of xs){ if (a.status==='jalan') grp.jalan.push(a); else if (a.status==='menunggu') grp.menunggu.push(a); else if (a.status==='diam') grp.diam.push(a); else if (now-a.akhir < SIMPAN_MENIT*60) grp.baru.push(a); else grp.arsip.push(a); }
   const item = (a, arsip) => { const lama = a.status==='jalan' ? now-a.mulai : a.durasi;
     return `<div class="item${a.id===pilihId?' pilih':''}${arsip?' arsip':''}" data-id="${esc(a.id)}"><span class="dot d-${a.status}"></span><span class="peran p-${esc(a.peran)}">${esc(a.peran)}</span><span class="nm">${esc(a.deskripsi)}</span><span class="wkt">${dur(lama)}</span></div>`; };
-  $('daftar').innerHTML =
+  // peringatan sumber data di atas daftar (bedakan dari "memang tak ada agen")
+  const awas = DATA.peringatan ? `<div style="margin:8px 4px;padding:8px 10px;border-radius:8px;background:rgba(240,181,74,.15);color:#f0b54a;font-size:12.5px">${esc(DATA.peringatan)}</div>` : '';
+  $('daftar').innerHTML = awas +
     (grp.jalan.length ? `<div class="grp">Sedang kerja (${grp.jalan.length})</div>`+grp.jalan.map(a=>item(a)).join('') : '<div class="grp">Sedang kerja (0)</div><div style="font-size:12.5px;color:var(--teks3);padding:2px 8px">Tidak ada agen yang kerja. Coba tombol Demo.</div>') +
     (grp.menunggu.length ? `<div class="grp">Menunggu balasanmu (${grp.menunggu.length})</div>`+grp.menunggu.map(a=>item(a)).join('') : '') +
     (grp.diam.length ? `<div class="grp">Tertidur / diam (${grp.diam.length})</div>`+grp.diam.map(a=>item(a)).join('') : '') +

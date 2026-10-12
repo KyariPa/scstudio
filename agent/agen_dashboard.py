@@ -6,7 +6,9 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8790
-AKAR = os.path.join(os.path.expanduser('~'), '.claude', 'projects')
+# folder config Claude Code: ikut CLAUDE_CONFIG_DIR bila diset (sama seperti Claude Code), selain itu ~/.claude
+CLAUDE_DIR = os.path.expanduser(os.environ.get('CLAUDE_CONFIG_DIR') or os.path.join('~', '.claude'))
+AKAR = os.path.join(CLAUDE_DIR, 'projects')
 DIR = os.path.dirname(os.path.abspath(__file__))
 DIAM_DETIK = 150  # tanpa aktivitas selama ini & belum lapor = "diam"
 
@@ -371,7 +373,17 @@ def kumpulkan(jam):
         s['estimasi'], s['dasar_estimasi'] = None, ''
     agen += sesi
     agen.sort(key=lambda a: ({'jalan': 0, 'menunggu': 1, 'diam': 2, 'selesai': 3}[a['status']], -a['mulai']))
-    return {'sekarang': sekarang, 'agen': agen, 'diam_detik': DIAM_DETIK}
+    return {'sekarang': sekarang, 'agen': agen, 'diam_detik': DIAM_DETIK, 'akar': AKAR, 'peringatan': peringatan_sumber()}
+
+
+def peringatan_sumber():
+    # kosong bukan berarti salah: bedakan "folder tak ada" / "belum ada transkrip sama sekali" dari "tak ada yg jalan"
+    if not os.path.isdir(AKAR):
+        return (f'Folder transkrip Claude Code tidak ditemukan: {AKAR}. Pastikan Claude Code sudah dipakai di komputer ini; '
+                'kalau folder config-nya dipindah, jalankan server dengan CLAUDE_CONFIG_DIR yang sama.')
+    if not glob.glob(os.path.join(AKAR, '*', '*.jsonl')):
+        return f'Belum ada transkrip sesi di {AKAR}. Jalankan Claude Code sekali, lalu dashboard akan terisi otomatis.'
+    return ''
 
 
 # ═════ QUEST QA (katalog test case) ═════
@@ -494,8 +506,8 @@ def api_qa_tc(k, id_):
 # Selama server jalan, tiap CATATAN_DETIK ditulis ~/.claude/catatan-bersama.md: poin penting tiap sesi utama aktif
 # (tugas sekarang, arah, jejak kerja, kalimat terakhir, agen yg dijalankan) -> sesi lain tinggal baca supaya paham sama.
 # Bagian manual dibaca dari ~/.claude/catatan-bersama-manual.md (tidak pernah ditimpa).
-CATATAN = os.path.join(os.path.expanduser('~'), '.claude', 'catatan-bersama.md')
-CATATAN_MANUAL = os.path.join(os.path.expanduser('~'), '.claude', 'catatan-bersama-manual.md')
+CATATAN = os.path.join(CLAUDE_DIR, 'catatan-bersama.md')
+CATATAN_MANUAL = os.path.join(CLAUDE_DIR, 'catatan-bersama-manual.md')
 CATATAN_DETIK = 15
 
 
@@ -545,6 +557,9 @@ def susun_catatan():
 def penulis_catatan():
     lama = None
     while True:
+        if not os.path.isdir(CLAUDE_DIR):  # folder config belum ada: jangan menulis apa pun (peringatan sudah tampil di UI)
+            time.sleep(CATATAN_DETIK)
+            continue
         try:
             isi = susun_catatan()
             badan = isi.split('\n', 1)[1]  # abaikan baris jam: tulis ulang hanya kalau isi berubah atau tiap 60 dtk
@@ -644,6 +659,8 @@ class H(BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     print(f'Dashboard agen: http://localhost:{PORT}  (baca {AKAR})')
+    if peringatan_sumber():
+        print('PERINGATAN:', peringatan_sumber())
     print(f'Catatan bersama: {CATATAN} (tiap {CATATAN_DETIK} dtk)')
     threading.Thread(target=penulis_catatan, daemon=True).start()
     ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

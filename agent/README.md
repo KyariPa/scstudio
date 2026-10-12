@@ -17,6 +17,17 @@ Lalu buka http://localhost:8790. Di Windows cukup klik dua kali `jalankan.bat`.
 
 Opsional: supaya katalog test case QA tampil di desa, salin `qa.contoh.json` jadi `qa.json` lalu isi path folder QA-nya. Lihat bagian Quest QA.
 
+### Pakai di komputer lain
+
+Tidak perlu login atau API key. Server membaca transkrip Claude Code milik siapa pun yang menjalankannya, dari folder `~/.claude/projects`. Begitu Claude Code pernah dipakai di komputer itu, agen dan sesinya langsung tampil.
+
+- **Folder config dipindah:** kalau Claude Code dijalankan dengan `CLAUDE_CONFIG_DIR`, jalankan server dengan variabel yang sama. Server ikut membaca `$CLAUDE_CONFIG_DIR/projects` dan menulis catatan bersama ke folder itu juga.
+  ```bash
+  CLAUDE_CONFIG_DIR=/path/ke/config python agen_dashboard.py 8790
+  ```
+- **Data kosong:** kalau folder transkrip tidak ada, atau ada tapi belum berisi transkrip sesi, dashboard dan desa menampilkan peringatan berisi path yang sedang dibaca. Peringatan yang sama juga dicetak di konsol saat server mulai. Jadi tampilan kosong karena salah folder bisa dibedakan dari tampilan kosong karena memang belum ada agen yang jalan.
+- **Hanya diuji di satu lingkungan:** format transkrip adalah format internal Claude Code. Kode ini diuji di Claude Code 2.1.295 lewat aplikasi desktop Windows. Versi lain atau CLI di Mac/Linux mungkin perlu penyesuaian.
+
 Syaratnya Python 3.9 ke atas, tanpa paket tambahan. Halaman `/desa` memuat Three.js 0.160 dari CDN jsdelivr, jadi butuh internet.
 
 ## Sumber data
@@ -165,7 +176,7 @@ Data QA dimuat ulang tiap 30 detik. Papan dan slime hanya dibangun ulang kalau a
 |---|---|
 | `GET /` | dashboard |
 | `GET /desa` | Desa Agen |
-| `GET /api/agen?jam=24` | daftar agen dalam N jam terakhir, lengkap |
+| `GET /api/agen?jam=24` | daftar agen dalam N jam terakhir, lengkap; juga `akar` (folder yang dibaca) dan `peringatan` |
 | `GET /api/agen?jam=24&ringkas=1` | daftar tanpa `prompt` / `laporan` / `tugas` (dipakai desa) |
 | `GET /api/agen/detail?id=<id>` | satu agen, lengkap |
 | `GET /catatan` | isi catatan bersama terakhir (teks markdown) |
