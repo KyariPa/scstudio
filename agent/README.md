@@ -116,6 +116,22 @@ Supaya tidak bolak-balik, ia baru pindah setelah tool-nya stabil 5 detik (`LEAD_
 - **Siklus hidup:** agen baru muncul di gerbang lalu berjalan ke areanya. Agen yang selesai menyerahkan laporan di papan Balai Guild, duduk di kedai selama 10 menit, lalu pulang.
 - **Kontrol:** drag untuk menggeser, scroll untuk zoom, WASD, Q/E memutar kamera 90°. Klik agen di daftar atau di peta untuk memindahkan kamera ke sana dan membuka panel detail.
 - **Demo:** tombol Demo memunculkan 6 agen tiruan, berguna saat tidak ada agen yang jalan.
+- **Mode hemat:** tombol Hemat menurunkan beban grafis. Pilihannya tersimpan per browser di `localStorage`. Isinya:
+  - render dibatasi 30 fps;
+  - bayangan matahari dimatikan;
+  - resolusi render 1x, tanpa pengali HiDPI;
+  - rumput disembunyikan.
+
+  Kalau rata-rata di bawah 40 fps selama 6 detik saat tab terlihat, desa menawarkan mode ini sekali.
+
+  Hasil ukur di 1920x1080 dengan semua area terlihat:
+
+  | Mode | Render | Frame lambat (p95) |
+  |---|---|---|
+  | Normal | ~57 fps, dengan bayangan | 25 ms |
+  | Hemat | 30 fps, tanpa bayangan | loop browser tetap lancar, 8,5 ms |
+
+  Server sendiri ringan: sekitar 33 MB RAM dan ~3% dari satu inti CPU.
 
 ## Catatan bersama antar sesi
 

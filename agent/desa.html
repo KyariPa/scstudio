@@ -80,6 +80,8 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
 .qpill{display:inline-block;font-size:11px;font-weight:700;color:#1a1a1a;padding:1px 8px;border-radius:6px}
 .lblSlime{background:rgba(120,20,20,.85);color:#fff;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:5px;pointer-events:none}
 .lblSlime{display:none}.dekat .lblSlime,.lblSlime.on{display:block}
+#saranHemat button{font:inherit;font-size:12.5px;background:rgba(255,255,255,.1);color:var(--teks);border:1px solid var(--garis);border-radius:7px;padding:4px 10px;cursor:pointer}
+#saranHemat button#bSaranYa{border-color:var(--emas);color:var(--emas)}
 #galat{z-index:20;position:fixed;left:50%;top:12px;transform:translateX(-50%);background:#7a2020;color:#fff;padding:6px 12px;border-radius:8px;display:none;font-size:13px}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
@@ -95,10 +97,11 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
   <button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
-  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button>
+  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bHemat" title="Mode hemat: 30 fps, tanpa bayangan, resolusi 1x, tanpa rumput">Hemat</button>
   <span class="bantu">Drag geser · Scroll zoom · WASD · klik stickman</span>
 </div>
 <div id="galat"></div>
+<div id="saranHemat" class="panel" style="display:none;left:50%;top:12px;transform:translateX(-50%);padding:8px 12px;font-size:13px;gap:10px;align-items:center">Desa terasa berat di perangkat ini. <button id="bSaranYa">Nyalakan mode hemat</button><button id="bSaranTidak">Nanti</button></div>
 <script type="module">
 import * as THREE from 'three';
 import {CSS2DRenderer, CSS2DObject} from 'three/addons/renderers/CSS2DRenderer.js';
@@ -165,6 +168,7 @@ function labelDunia(teks, x, y, z, kelas='bangun'){ const d=document.createEleme
 // Tiap area kerja = lapangan terbuka berisi properti & gimmick hidup (user 12-10: "lebih advanced, ini kaku banget").
 // HIDUP = fungsi animasi dunia dipanggil tiap frame: f(t, dt).
 const HIDUP = [];
+let RUMPUT = null; // InstancedMesh rumput - disembunyikan di mode hemat
 const acak = (s => () => (s = (s*16807) % 2147483647) / 2147483647)(1234);
 const tanah = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), mat(0x7fb069));
 tanah.rotation.x = -Math.PI/2; tanah.receiveShadow = true; scene.add(tanah);
@@ -427,7 +431,7 @@ for (let i=0;i<40;i++){ const a=acak()*Math.PI*2, r=18+acak()*50, x=Math.cos(a)*
     dum.position.set(x, 0.25, z); dum.rotation.set((acak()-.5)*0.3, acak()*6, (acak()-.5)*0.3); dum.scale.setScalar(0.7+acak()*0.8); dum.updateMatrix(); rumput.setMatrixAt(nR++, dum.matrix); }
   while (nB < 420){ const x = (acak()-.5)*140, z = (acak()-.5)*140+18; if (!bebas(x,z,0.8)) continue;
     dum.position.set(x, 0.32, z); dum.rotation.set(0,0,0); dum.scale.setScalar(0.8+acak()*0.6); dum.updateMatrix(); bunga.setMatrixAt(nB, dum.matrix); bunga.setColorAt(nB++, wB[Math.floor(acak()*wB.length)]); }
-  rumput.receiveShadow = true; scene.add(rumput); scene.add(bunga);
+  rumput.receiveShadow = true; scene.add(rumput); scene.add(bunga); RUMPUT = rumput;
 }
 
 // ═════ STASIUN KERJA (slot) ═════
@@ -1119,8 +1123,34 @@ function pick(x, y){ ndc.set(x/innerWidth*2-1, -(y/innerHeight)*2+1); ray.setFro
 // ═════ LOOP ═════
 const jamDunia = new THREE.Clock();
 let detikUI = 0;
+// ═════ MODE HEMAT: 30 fps, tanpa bayangan matahari, resolusi 1x, tanpa rumput. Pilihan diingat per browser. ═════
+const FPS_HEMAT = 30;
+let hemat = false, akum = 0;
+try { hemat = localStorage.getItem('desaHemat') === '1'; } catch (e) {}
+function terapkanHemat(){
+  renderer.setPixelRatio(hemat ? 1 : Math.min(devicePixelRatio, 2));
+  matahari.castShadow = !hemat;
+  if (RUMPUT) RUMPUT.visible = !hemat;
+  $('bHemat').classList.toggle('on', hemat);
+  try { localStorage.setItem('desaHemat', hemat ? '1' : '0'); } catch (e) {}
+  ukuran();
+}
+$('bHemat').onclick = () => { hemat = !hemat; terapkanHemat(); $('saranHemat').style.display = 'none'; };
+// saran otomatis: rata-rata < 40 fps selama 6 dtk (tab terlihat, belum hemat) -> tawarkan sekali per sesi halaman
+const pantauFps = {n:0, t:0, ditolak:false};
+$('bSaranYa').onclick = () => { hemat = true; terapkanHemat(); $('saranHemat').style.display = 'none'; };
+$('bSaranTidak').onclick = () => { pantauFps.ditolak = true; $('saranHemat').style.display = 'none'; };
+function cekFps(dtAsli){
+  if (hemat || pantauFps.ditolak || document.visibilityState !== 'visible' || dtAsli > 0.5) return;
+  pantauFps.n++; pantauFps.t += dtAsli;
+  if (pantauFps.t >= 6){ const fps = pantauFps.n / pantauFps.t; pantauFps.n = 0; pantauFps.t = 0;
+    if (fps < 40){ pantauFps.ditolak = true; $('saranHemat').style.display = 'flex'; } }
+}
 function loop(){
-  const dt = Math.min(0.05, jamDunia.getDelta());
+  requestAnimationFrame(loop);
+  const dtAsli = jamDunia.getDelta(); akum += dtAsli; cekFps(dtAsli);
+  if (hemat && akum < 1/FPS_HEMAT - 0.002) return;   // lewati frame: batas 30 fps
+  const dt = Math.min(0.05, akum); akum = 0;
   // kamera halus
   const sp = 24*dt/kam.zoom;
   if (tombol.has('w')) geser(0, sp/((VIEW/kam.zoom)/innerHeight)*Math.sin(kam.el)); if (tombol.has('s')) geser(0, -sp/((VIEW/kam.zoom)/innerHeight)*Math.sin(kam.el));
@@ -1139,9 +1169,8 @@ function loop(){
   for (const f of HIDUP) f(tt, dt);
   renderer.render(scene, camera); labelR.render(scene, camera);
   detikUI += dt; if (detikUI > 1){ detikUI = 0; gambarDaftar(); if (pilihId) gambarDetail(); for (const o of AGEN.values()) if (o.data && o.data.status==='jalan') tulisLabel(o); }
-  requestAnimationFrame(loop);
 }
-ukuran(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
+terapkanHemat(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
 </script>
 </body>
 </html>
