@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard Agen</title>
+<style>
+:root{--bg:#f6f5f1;--kartu:#fff;--garis:rgba(11,11,11,.1);--teks:#141413;--teks2:#5a5954;--teks3:#8b8a84;
+--jalan:#1f7a4d;--jalan-bg:#e3f3ea;--diam:#9a6400;--diam-bg:#fbf0d9;--selesai:#5a5954;--selesai-bg:#efeee9;--aksen:#2a78d6;--track:#ebeae4}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1a1a19;--kartu:#232322;--garis:rgba(255,255,255,.1);--teks:#f0efec;--teks2:#c3c2b7;--teks3:#898781;
+--jalan:#5fd39a;--jalan-bg:#1d3a2b;--diam:#f0b54a;--diam-bg:#3d3018;--selesai:#c3c2b7;--selesai-bg:#2e2e2c;--aksen:#5a9cf0;--track:#333331}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--teks);font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+h1{font-size:22px;font-weight:600;margin:0}
+.atas{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.sub{color:var(--teks3);font-size:13px}
+.kontrol{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+select,input{font:inherit;font-size:14px;padding:6px 10px;border-radius:8px;border:1px solid var(--garis);background:var(--kartu);color:var(--teks)}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.kpi div{background:var(--kartu);border:1px solid var(--garis);border-radius:12px;padding:12px 14px}
+.kpi b{display:block;font-size:26px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi span{font-size:13px;color:var(--teks2)}
+h2{font-size:16px;font-weight:600;margin:26px 0 10px;display:flex;gap:8px;align-items:center}
+.kartu{background:var(--kartu);border:1px solid var(--garis);border-radius:12px;padding:14px 16px;margin-bottom:10px}
+.baris1{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.judul{font-weight:600;font-size:15px;flex:1;min-width:200px}
+.pil{font-size:12px;padding:2px 10px;border-radius:999px;font-weight:600;white-space:nowrap}
+.jalan .pil{background:var(--jalan-bg);color:var(--jalan)} .diam .pil{background:var(--diam-bg);color:var(--diam)} .selesai .pil{background:var(--selesai-bg);color:var(--selesai)}
+.jalan{border-left:3px solid var(--jalan);border-radius:0 12px 12px 0}
+.titik{width:8px;height:8px;border-radius:50%;background:var(--jalan);display:inline-block;animation:kedip 1.2s infinite}
+@keyframes kedip{50%{opacity:.25}}
+.meta{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:var(--teks2);margin-top:6px;font-variant-numeric:tabular-nums}
+.bar{height:6px;background:var(--track);border-radius:4px;overflow:hidden;margin-top:10px}
+.bar i{display:block;height:100%;background:var(--aksen);border-radius:4px;transition:width .5s}
+.lewat .bar i{background:var(--diam)}
+.aksi{font-size:13px;margin-top:8px;color:var(--teks2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.aksi code{font-size:12px;background:var(--track);padding:1px 6px;border-radius:5px;color:var(--teks)}
+details{margin-top:8px} summary{cursor:pointer;font-size:13px;color:var(--aksen)}
+pre{white-space:pre-wrap;word-break:break-word;font-size:12.5px;background:var(--bg);border:1px solid var(--garis);border-radius:8px;padding:10px;max-height:340px;overflow:auto;margin:8px 0 0}
+table{width:100%;border-collapse:collapse;background:var(--kartu);border:1px solid var(--garis);border-radius:12px;overflow:hidden;font-size:14px}
+td,th{padding:9px 12px;border-top:1px solid var(--garis);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--teks3);font-weight:600;border-top:0}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.klik{cursor:pointer} tr.klik:hover td{background:var(--bg)}
+.kosong{color:var(--teks3);font-size:14px;padding:14px 0}
+.galat{color:#c0392b;font-size:13px}
+@media (max-width:640px){.sembunyi-hp{display:none}}
+.peran{font-size:11.5px;font-weight:700;padding:1px 8px;border-radius:6px;letter-spacing:.02em;white-space:nowrap;border:1px solid transparent;margin-right:8px}
+.peran.tebak{border-style:dashed}
+.p-Dev{background:#e3eefb;color:#1d5fae;border-color:#1d5fae55}.p-QA{background:#ece9fb;color:#4b3cb8;border-color:#4b3cb855}
+.p-Tester{background:#dff5ee;color:#0f6e56;border-color:#0f6e5655}.p-Document{background:#fbeadf;color:#a2481c;border-color:#a2481c55}
+.p-Lain{background:var(--selesai-bg);color:var(--selesai);border-color:var(--garis)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .p-Dev{background:#16304f;color:#8cbcf5}:root:not([data-theme=light]) .p-QA{background:#2a2552;color:#b3aaf2}
+:root:not([data-theme=light]) .p-Tester{background:#103b30;color:#7fdcbc}:root:not([data-theme=light]) .p-Document{background:#47271a;color:#f2a57c}}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 18px}
+.chip{font:inherit;font-size:13px;padding:4px 12px;border-radius:999px;border:1px solid var(--garis);background:var(--kartu);color:var(--teks2);cursor:pointer}
+.chip.aktif{border-color:var(--aksen);color:var(--teks);box-shadow:inset 0 0 0 1px var(--aksen)}
+</style>
+</head>
+<body>
+<main>
+  <div class="atas">
+    <div><h1>Dashboard agen <a href="/desa" style="font-size:13px;font-weight:500;color:var(--aksen);text-decoration:none;margin-left:8px">Buka Desa Agen &rarr;</a></h1><div class="sub" id="info">memuat...</div></div>
+    <div class="kontrol">
+      <select id="jam" aria-label="Rentang waktu">
+        <option value="1">1 jam terakhir</option><option value="6">6 jam</option>
+        <option value="24" selected>24 jam</option><option value="168">7 hari</option>
+      </select>
+      <input id="cari" placeholder="Cari agen..." aria-label="Cari">
+    </div>
+  </div>
+  <div class="kpi">
+    <div><b id="kJalan">-</b><span>Sedang jalan</span></div>
+    <div><b id="kDiam">-</b><span>Diam / belum lapor</span></div>
+    <div><b id="kSelesai">-</b><span>Selesai</span></div>
+    <div><b id="kWaktu">-</b><span>Total waktu agen</span></div>
+  </div>
+  <div class="chips" id="chips"></div>
+  <h2><span class="titik"></span>Sedang jalan</h2>
+  <div id="aktif"></div>
+  <h2>Selesai</h2>
+  <div id="selesai"></div>
+</main>
+<script>
+let DATA=null, selisih=0, terbuka=new Set();
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function dur(s){s=Math.max(0,Math.round(s));const j=Math.floor(s/3600),m=Math.floor(s%3600/60),d=s%60;return j?`${j}j ${m}m`:m?`${m}m ${String(d).padStart(2,'0')}d`:`${d}d`}
+function jam(t){return new Date(t*1000).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}
+function tgl(t){const d=new Date(t*1000);return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short'})+' '+jam(t)}
+const PERAN=['Dev','QA','Tester','Document','Lain'];let peranPilih=null;
+function lencana(a){return `<span class="peran p-${esc(a.peran)}${a.peran_tebakan?' tebak':''}" title="${a.peran_tebakan?'Peran ditebak dari kata kunci (agen lama tanpa awalan)':'Peran dari awalan deskripsi'}">${esc(a.peran)}</span>`}
+function cocok(a){const q=$('cari').value.trim().toLowerCase();return (!peranPilih||a.peran===peranPilih)&&(!q||(a.peran+' '+a.deskripsi+' '+a.judul_sesi+' '+a.id+' '+a.prompt).toLowerCase().includes(q))}
+function gambarChips(){if(!DATA)return;const n={};DATA.agen.forEach(a=>n[a.peran]=(n[a.peran]||0)+1);
+  $('chips').innerHTML=[`<button class="chip${!peranPilih?' aktif':''}" data-p="">Semua ${DATA.agen.length}</button>`,
+   ...PERAN.filter(p=>n[p]).map(p=>`<button class="chip${peranPilih===p?' aktif':''}" data-p="${p}"><span class="peran p-${p}" style="margin-right:6px">${p}</span>${n[p]}</button>`)].join('')}
+async function ambil(){
+  try{
+    const r=await fetch('/api/agen?jam='+$('jam').value,{cache:'no-store'});const j=await r.json();
+    if(j.error)throw new Error(j.error);
+    DATA=j;selisih=j.sekarang-Date.now()/1000;gambar();
+  }catch(e){$('info').innerHTML='<span class="galat">Gagal baca server: '+esc(e.message)+'</span>'}
+}
+function kartuAktif(a,now){
+  const lama=a.status==='jalan'?now-a.mulai:a.durasi;
+  const est=a.estimasi, pct=est?Math.min(99,lama/est*100):null, lewat=est&&lama>est;
+  const sisa=est?(lewat?'melewati estimasi '+dur(lama-est):'sisa ~'+dur(est-lama)):'belum ada data estimasi';
+  return `<div class="kartu ${a.status}${lewat?' lewat':''}">
+    <div class="baris1"><span class="judul">${lencana(a)}${esc(a.deskripsi)}</span>
+      <span class="pil">${a.status==='jalan'?'Jalan':'Diam '+dur(a.idle)}</span></div>
+    <div class="meta"><span>Mulai ${jam(a.mulai)}</span><span>Sudah ${dur(lama)}</span>
+      <span>Estimasi ${est?dur(est):'-'} (${esc(sisa)})</span><span>${a.tools} aksi</span>
+      <span class="sembunyi-hp">${esc(a.judul_sesi||a.sesi)}</span></div>
+    <div class="bar" title="${esc(a.dasar_estimasi)}"><i style="width:${pct??3}%"></i></div>
+    <div class="aksi">Terakhir: <code>${esc(a.tool_akhir||'-')}</code> ${esc(a.detail_akhir)}</div>
+    ${a.teks_akhir?`<div class="aksi" style="white-space:normal">${esc(a.teks_akhir.slice(0,220))}</div>`:''}
+    <details data-id="${a.id}" ${terbuka.has(a.id)?'open':''}><summary>Tugas lengkap</summary><pre>${esc(a.prompt)}</pre></details>
+  </div>`;
+}
+function gambar(){
+  if(!DATA)return;const now=Date.now()/1000+selisih;gambarChips();
+  const xs=DATA.agen.filter(cocok);
+  const akt=xs.filter(a=>a.status!=='selesai'), sel=xs.filter(a=>a.status==='selesai');
+  $('kJalan').textContent=xs.filter(a=>a.status==='jalan').length;
+  $('kDiam').textContent=xs.filter(a=>a.status==='diam').length;
+  $('kSelesai').textContent=sel.length;
+  $('kWaktu').textContent=dur(xs.reduce((s,a)=>s+(a.status==='jalan'?now-a.mulai:a.durasi),0));
+  $('info').textContent=`Dibaca langsung dari transkrip agen · diperbarui ${jam(DATA.sekarang)} · "diam" = belum lapor & tak ada aktivitas > ${DATA.diam_detik} dtk`;
+  $('aktif').innerHTML=akt.length?akt.map(a=>kartuAktif(a,now)).join(''):'<div class="kosong">Tidak ada agen yang sedang jalan.</div>';
+  $('selesai').innerHTML=sel.length?`<table><tr><th>Agen</th><th class="sembunyi-hp">Sesi</th><th>Mulai</th><th style="text-align:right">Durasi</th><th style="text-align:right">Aksi</th></tr>
+    ${sel.map(a=>`<tr class="klik" data-id="${a.id}"><td>${lencana(a)}${esc(a.deskripsi)}${terbuka.has(a.id)?`<pre>${esc(a.laporan||a.teks_akhir||'(tanpa laporan)')}</pre><details><summary>Tugas lengkap</summary><pre>${esc(a.prompt)}</pre></details>`:''}</td>
+    <td class="sembunyi-hp" style="color:var(--teks2)">${esc(a.judul_sesi||a.sesi)}</td><td class="n" style="text-align:left">${tgl(a.mulai)}</td><td class="n">${dur(a.durasi)}</td><td class="n">${a.tools}</td></tr>`).join('')}</table>`
+    :'<div class="kosong">Belum ada agen selesai di rentang ini.</div>';
+}
+document.addEventListener('click',e=>{const tr=e.target.closest('tr.klik');if(tr&&!e.target.closest('details,pre')){const id=tr.dataset.id;terbuka.has(id)?terbuka.delete(id):terbuka.add(id);gambar()}});
+document.addEventListener('toggle',e=>{const d=e.target;if(d.dataset&&d.dataset.id){d.open?terbuka.add(d.dataset.id):terbuka.delete(d.dataset.id)}},true);
+document.addEventListener('click',e=>{const c=e.target.closest('.chip');if(c){peranPilih=c.dataset.p||null;gambar()}});
+$('jam').onchange=ambil;$('cari').oninput=gambar;
+ambil();setInterval(ambil,3000);setInterval(gambar,1000);
+</script>
+</body>
+</html>

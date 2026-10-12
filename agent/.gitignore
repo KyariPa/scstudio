@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+# transkrip agen tidak pernah masuk repo
+*.jsonl
