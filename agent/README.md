@@ -5,6 +5,8 @@ Pantau pekerjaan Claude Code secara live dari browser: subagen yang sedang jalan
 - **Dashboard** (`/`): tabel agen dan sesi yang jalan, menunggu, diam, dan selesai. Isinya peran, durasi, estimasi, tool terakhir, laporan, tugas lengkap, dan riwayat tugas sesi utama.
 - **Desa Agen** (`/desa`): desa RPG 3D low-poly dengan kamera miring ala Ragnarok atau Harvest Moon. Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya. Gerakannya mengikuti tool yang sedang ia pakai, jadi agen yang sedang mengedit kode terlihat menempa di landasan.
 
+> Untuk asisten AI yang memakai atau mengubah folder ini, ada panduan khusus di [`AGENTS.md`](AGENTS.md). Isinya penempatan, konvensi, peta kode, resep perubahan, jebakan yang sudah diketahui, dan cara menguji. `CLAUDE.md` otomatis mengarahkan Claude Code ke panduan itu.
+
 Server cuma membaca file transkrip, tidak mengubah apa pun, dan hanya mendengar di `127.0.0.1`. Satu-satunya file yang ia tulis adalah catatan bersama (`~/.claude/catatan-bersama.md`). Request dengan header `Host` selain `localhost` atau `127.0.0.1` ditolak (403), supaya situs lain tidak bisa membaca data agen lewat DNS rebinding. Akibatnya, dashboard hanya bisa dibuka lewat http://localhost:8790 atau http://127.0.0.1:8790.
 
 ## Menjalankan
