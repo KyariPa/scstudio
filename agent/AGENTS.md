@@ -269,8 +269,10 @@ EOF
 
    | Versi | Normal | Hemat |
    |---|---|---|
-   | sebelum upgrade (`383a278`) | ~1470 draw call/frame | ~140 |
-   | sesudah | (sedang diukur) | (sedang diukur) |
+   | sebelum upgrade (`383a278`) | ~1430–1470 draw call/frame | ~140 |
+   | sesudah | ~690 | ~195 |
+
+   Draw call tidak bergantung resolusi (kamera ortografis dengan aspek yang sama menampilkan area dunia yang sama), jadi boleh diukur di viewport kecil. Di versi baru Hemat sedikit lebih tinggi daripada versi lama karena kontennya bertambah (aula, sungai, ladang, karakter yang lebih detail), tapi tetap tanpa bayangan dan post-processing. Fps sungguhan harus diukur di GPU asli.
 
    Server sendiri ringan: sekitar 33 MB RAM dan ~3% dari satu inti CPU.
 

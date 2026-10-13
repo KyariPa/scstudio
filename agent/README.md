@@ -142,7 +142,7 @@ Supaya tidak bolak-balik, ia baru pindah setelah tool-nya stabil 5 detik (`LEAD_
 
   Kalau rata-rata di bawah 40 fps selama 6 detik saat tab terlihat, desa menawarkan mode Hemat sekali.
 
-  Performa belum diukur di GPU sungguhan setelah upgrade ini. Lihat angka fps di peta mini untuk mengukurnya di mesinmu sendiri. Yang sudah terukur adalah jumlah draw call per frame, yaitu beban terbesar di sisi CPU: angka sebelum dan sesudah ada di `AGENTS.md` bagian 7.
+  Performa belum diukur di GPU sungguhan setelah upgrade ini. Lihat angka fps di peta mini untuk mengukurnya di mesinmu sendiri. Yang sudah terukur adalah jumlah draw call per frame, yaitu beban terbesar di sisi CPU: di mode Normal turun dari sekitar 1430 menjadi sekitar 690 (detail di `AGENTS.md` bagian 7).
 
 ## Catatan bersama antar sesi
 
