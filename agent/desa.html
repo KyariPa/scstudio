@@ -97,7 +97,7 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
   <button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
-  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bHemat" title="Mode hemat: 30 fps, tanpa bayangan, resolusi 1x, tanpa rumput">Hemat</button>
+  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bHemat" title="Kualitas grafis. Hemat: 30 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift. Ultra: + ambient occlusion, bayangan tajam.">Grafis: Normal</button>
   <span class="bantu">Drag geser · Scroll zoom · WASD · klik stickman</span>
 </div>
 <div id="galat"></div>
@@ -105,6 +105,13 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
 <script type="module">
 import * as THREE from 'three';
 import {CSS2DRenderer, CSS2DObject} from 'three/addons/renderers/CSS2DRenderer.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {GTAOPass} from 'three/addons/postprocessing/GTAOPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 // ═════ KONFIG ═════
 const SIMPAN_MENIT = 10;           // agen selesai nongkrong di kedai selama ini, lalu pulang
@@ -124,10 +131,11 @@ const V = (x,y,z) => new THREE.Vector3(x,y,z);
 
 // ═════ RENDERER, SCENE, KAMERA ═════
 const wadah = $('dunia');
-const renderer = new THREE.WebGLRenderer({antialias:true});
+const renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:'high-performance'});
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
 wadah.appendChild(renderer.domElement);
 const labelR = new CSS2DRenderer();
 labelR.domElement.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:1';
@@ -135,26 +143,92 @@ document.body.appendChild(labelR.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x9fc5a8);
-scene.fog = new THREE.Fog(0x9fc5a8, 170, 320);
-scene.add(new THREE.HemisphereLight(0xfff4e0, 0x5b7a52, 1.15));
-const matahari = new THREE.DirectionalLight(0xfff0d6, 1.9);
-matahari.position.set(40, 70, 30); matahari.castShadow = true;
-matahari.shadow.mapSize.set(2048, 2048);
-Object.assign(matahari.shadow.camera, {left:-80, right:80, top:80, bottom:-80, near:1, far:220});
-matahari.shadow.bias = -0.0005;
-scene.add(matahari);
+scene.fog = new THREE.Fog(0x9fc5a8, 290, 470);   // jarak dari kamera (kamera 260 stud dari titik fokus)
+const hemi = new THREE.HemisphereLight(0xfff4e0, 0x5b7a52, 1.15); scene.add(hemi);
+const matahari = new THREE.DirectionalLight(0xfff0d6, 2.1);
+matahari.castShadow = true; matahari.shadow.mapSize.set(2048, 2048);
+Object.assign(matahari.shadow.camera, {left:-40, right:40, top:40, bottom:-40, near:1, far:300});
+matahari.shadow.bias = -0.0004; matahari.shadow.normalBias = 0.03;
+scene.add(matahari, matahari.target);
+const ARAH_MATAHARI = V(40, 70, 30).normalize();   // arah DARI tanah KE matahari; diubah siklus siang-malam
 
-const camera = new THREE.OrthographicCamera(-1,1,1,-1,-500,1000);
+const camera = new THREE.OrthographicCamera(-1,1,1,-1,1,800);   // near > 0: dibutuhkan GTAO (kedalaman linear)
 const VIEW = 32; // tinggi dunia yg terlihat (stud) pada zoom 1
 const kam = {target:V(0,0,10), az:Math.PI/4, azTuju:Math.PI/4, el:0.72, zoom:1, zoomTuju:1, fokus:null};
 function aturKamera(){
   const a = innerWidth/innerHeight, h = VIEW/kam.zoom;
   camera.left=-h*a/2; camera.right=h*a/2; camera.top=h/2; camera.bottom=-h/2; camera.updateProjectionMatrix();
-  const d = 150;
+  const d = 260;
   camera.position.set(kam.target.x+Math.sin(kam.az)*Math.cos(kam.el)*d, Math.sin(kam.el)*d, kam.target.z+Math.cos(kam.az)*Math.cos(kam.el)*d);
   camera.lookAt(kam.target);
 }
-function ukuran(){ renderer.setSize(innerWidth, innerHeight); labelR.setSize(innerWidth, innerHeight); aturKamera(); }
+// bayangan matahari: frustum ketat mengikuti area yg terlihat kamera, pusat di-snap ke grid texel (tak berkilau saat geser)
+const _bx = V(0,0,0), _by = V(0,0,0), _bz = V(0,0,0), _bc = V(0,0,0);
+function aturBayangan(){
+  const a = innerWidth/innerHeight, h = VIEW/kam.zoom;
+  const half = Math.min(110, Math.hypot(h*a, h/Math.sin(kam.el))/2 + 7), sc = matahari.shadow.camera;
+  if (Math.abs(sc.right - half) > 0.01){ sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.updateProjectionMatrix(); }
+  _bz.copy(ARAH_MATAHARI); _bx.set(0,1,0).cross(_bz).normalize(); _by.copy(_bz).cross(_bx);
+  const texel = 2*half / matahari.shadow.mapSize.x, ux = Math.round(kam.target.dot(_bx)/texel)*texel, uy = Math.round(kam.target.dot(_by)/texel)*texel;
+  _bc.copy(_bx).multiplyScalar(ux).addScaledVector(_by, uy).addScaledVector(_bz, kam.target.dot(_bz));
+  matahari.target.position.copy(_bc); matahari.position.copy(_bc).addScaledVector(ARAH_MATAHARI, 140);
+}
+
+// ═════ POST-PROCESSING: AO (Ultra) -> bloom -> tilt-shift -> tone mapping ACES -> color grading ═════
+const TILT = horiz => ({
+  uniforms: {tDiffuse:{value:null}, d:{value:0.001}, r:{value:0.5}, kuat:{value:1}},
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float d, r, kuat; varying vec2 vUv;
+    void main(){
+      float k = kuat * smoothstep(0.14, 0.62, abs(vUv.y - r));   // pita tengah tajam, tepi atas/bawah kabur = efek diorama
+      vec2 s = ${horiz ? 'vec2(d, 0.0)' : 'vec2(0.0, d)'} * k;
+      vec4 c = texture2D(tDiffuse, vUv) * 0.1633;
+      c += (texture2D(tDiffuse, vUv + s) + texture2D(tDiffuse, vUv - s)) * 0.1531;
+      c += (texture2D(tDiffuse, vUv + 2.0*s) + texture2D(tDiffuse, vUv - 2.0*s)) * 0.12245;
+      c += (texture2D(tDiffuse, vUv + 3.0*s) + texture2D(tDiffuse, vUv - 3.0*s)) * 0.0918;
+      c += (texture2D(tDiffuse, vUv + 4.0*s) + texture2D(tDiffuse, vUv - 4.0*s)) * 0.051;
+      gl_FragColor = c;
+    }`
+});
+const GRADE = {   // dijalankan SETELAH OutputPass (ruang tampilan sRGB)
+  uniforms: {tDiffuse:{value:null}, tint:{value:new THREE.Color(1.03, 1.0, 0.95)}, saturasi:{value:1.08}, kontras:{value:1.04}, vinyet:{value:0.55}, hangat:{value:1}},
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+  fragmentShader: `uniform sampler2D tDiffuse; uniform vec3 tint; uniform float saturasi, kontras, vinyet, hangat; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tDiffuse, vUv); vec3 x = c.rgb;
+      float l = dot(x, vec3(0.299, 0.587, 0.114));
+      x = mix(vec3(l), x, saturasi);
+      x = (x - 0.5) * kontras + 0.5;
+      x *= tint;
+      x += vec3(0.05, 0.02, -0.03) * hangat * smoothstep(0.45, 1.0, l);   // sorot terang sedikit keemasan
+      vec2 q = vUv - 0.5; x *= 1.0 - dot(q, q) * vinyet;
+      gl_FragColor = vec4(clamp(x, 0.0, 1.0), c.a);
+    }`
+};
+const FX = (() => {
+  const rt = new THREE.WebGLRenderTarget(1, 1, {type:THREE.HalfFloatType, samples:4});   // MSAA di dalam composer
+  const c = new EffectComposer(renderer, rt);
+  c.addPass(new RenderPass(scene, camera));
+  const ao = new GTAOPass(scene, camera, 1, 1);
+  // GTAOPass 0.160 salah menulis define kamera (typo) -> set manual utk kamera ortografis
+  ao.gtaoMaterial.defines.PERSPECTIVE_CAMERA = 0; ao.gtaoMaterial.needsUpdate = true;
+  ao.depthRenderMaterial.defines.PERSPECTIVE_CAMERA = 0; ao.depthRenderMaterial.needsUpdate = true;
+  ao.updateGtaoMaterial({radius:0.9, distanceExponent:1.4, thickness:1.2, scale:1, distanceFallOff:1});
+  ao.blendIntensity = 0.55; ao.enabled = false; c.addPass(ao);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.34, 0.55, 1.05); c.addPass(bloom);
+  const tiltH = new ShaderPass(TILT(true)), tiltV = new ShaderPass(TILT(false)); c.addPass(tiltH); c.addPass(tiltV);
+  c.addPass(new OutputPass());
+  const grade = new ShaderPass(GRADE); c.addPass(grade);
+  return {c, ao, bloom, tiltH, tiltV, grade};
+})();
+let rasioPiksel = 1;
+function ukuran(){
+  renderer.setPixelRatio(rasioPiksel); renderer.setSize(innerWidth, innerHeight); labelR.setSize(innerWidth, innerHeight);
+  FX.c.setPixelRatio(rasioPiksel); FX.c.setSize(innerWidth, innerHeight);
+  FX.bloom.setSize(Math.round(innerWidth*rasioPiksel/2), Math.round(innerHeight*rasioPiksel/2));   // bloom setengah resolusi
+  FX.tiltH.uniforms.d.value = 1.5/innerWidth; FX.tiltV.uniforms.d.value = 1.5/innerHeight;
+  aturKamera();
+}
 addEventListener('resize', ukuran);
 
 // ═════ MATERIAL & HELPER ═════
@@ -217,16 +291,19 @@ function api(x, y, z, s=1, cahaya=true){ // api unggun/tungku: kerucut emisif be
   HIDUP.push(t => { lidah.forEach((m,i) => { const k = 0.8 + Math.sin(t*(9+i*3)+fase+i)*0.18 + Math.sin(t*17+i)*0.08; m.scale.set(1, k, 1); m.rotation.y = t*(1+i*0.5); });
     if (L) L.intensity = 24*s + Math.sin(t*13+fase)*4*s + Math.sin(t*7.3)*3*s; });
 }
+// PARTIKEL = grup partikel dekoratif (asap, bara, kunang-kunang, daun, dll.) - disembunyikan & tak di-update di mode hemat
+const PARTIKEL = [];
+function grupPartikel(){ const g = new THREE.Group(); g.userData.dinamis = true; scene.add(g); PARTIKEL.push(g); return g; }
 // asap: kolam bola abu-abu naik dari titik sumber
 function asapDari(x, y, z, n=8, laju=0.2, lebar=1.4){
-  const bs = []; for (let i=0;i<n;i++){ const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5,0), new THREE.MeshStandardMaterial({color:0xd8d6d0, transparent:true, opacity:.5, flatShading:true})); scene.add(m); bs.push({m, t:i/n}); }
-  HIDUP.push((t, dt) => { for (const b of bs){ b.t = (b.t + dt*laju) % 1; b.m.position.set(x+Math.sin(b.t*6+b.m.id)*0.4, y+b.t*6, z+b.t*1.2); b.m.scale.setScalar(0.4+b.t*lebar); b.m.material.opacity = 0.5*(1-b.t); } });
+  const G = grupPartikel(), bs = []; for (let i=0;i<n;i++){ const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5,1), new THREE.MeshStandardMaterial({color:0xd8d6d0, transparent:true, opacity:.5, depthWrite:false})); G.add(m); bs.push({m, t:i/n}); }
+  HIDUP.push((t, dt) => { if (!G.visible) return; for (const b of bs){ b.t = (b.t + dt*laju) % 1; b.m.position.set(x+Math.sin(b.t*6+b.m.id)*0.4, y+b.t*6, z+b.t*1.2); b.m.scale.setScalar(0.4+b.t*lebar); b.m.material.opacity = 0.45*(1-b.t); } });
 }
 // bara melayang (partikel kecil emisif)
 function baraLayang(x, y, z, n=10){
-  const ps = []; const geo = new THREE.BoxGeometry(0.07,0.07,0.07); const m0 = emisif(0xffa23a, 2.5);
-  for (let i=0;i<n;i++){ const m = new THREE.Mesh(geo, m0); scene.add(m); ps.push({m, t:acak(), ox:(acak()-.5)*1.4, oz:(acak()-.5)*1.0}); }
-  HIDUP.push((t, dt) => { for (const p of ps){ p.t = (p.t + dt*0.35) % 1; p.m.position.set(x+p.ox+Math.sin(p.t*9+p.ox*5)*0.3, y+p.t*3.2, z+p.oz); p.m.scale.setScalar(1-p.t); } });
+  const G = grupPartikel(), ps = []; const geo = new THREE.BoxGeometry(0.07,0.07,0.07); const m0 = emisif(0xffa23a, 4);
+  for (let i=0;i<n;i++){ const m = new THREE.Mesh(geo, m0); G.add(m); ps.push({m, t:acak(), ox:(acak()-.5)*1.4, oz:(acak()-.5)*1.0}); }
+  HIDUP.push((t, dt) => { if (!G.visible) return; for (const p of ps){ p.t = (p.t + dt*0.35) % 1; p.m.position.set(x+p.ox+Math.sin(p.t*9+p.ox*5)*0.3, y+p.t*3.2, z+p.oz); p.m.scale.setScalar(1-p.t); } });
 }
 
 // ── tata letak ──
@@ -440,7 +517,7 @@ function buatStasiun(props, pembangun, ekstra={}){
   // agen berdiri di KIRI properti (dilihat dari kamera bawaan), menghadap ke kanan layar -> gerakan terlihat dari profil,
   // properti tidak menutupi badan. Jarak = jangkauan lengan+palu (1.15) x skala orang.
   const kananLayar = V(Math.cos(HADAP), 0, -Math.sin(HADAP)), yaw = Math.atan2(kananLayar.x, kananLayar.z);
-  return props.map(p => { const o = pembangun ? pembangun(p) : null; return {prop:p, obj:o, pos:p.clone().addScaledVector(kananLayar,-1.15*SKALA_ORANG), yaw, pakai:null, ...ekstra}; });
+  return props.map(p => { const o = pembangun ? pembangun(p) : null; if (o) o.traverse(m => { m.userData.dinamis = true; }); return {prop:p, obj:o, pos:p.clone().addScaledVector(kananLayar,-1.15*SKALA_ORANG), yaw, pakai:null, ...ekstra}; });
 }
 const STASIUN = {
   Dev:      {nama:'Pandai Besi', slot: buatStasiun(PROP_DEV, landasan)},
@@ -1120,25 +1197,65 @@ function pick(x, y){ ndc.set(x/innerWidth*2-1, -(y/innerHeight)*2+1); ray.setFro
   if (u.papan) return {papan: u.papan};
   return null; }
 
+// ═════ STATIC BATCHING: gabung mesh dunia yg diam jadi sedikit draw call ═════
+// Mesh dianggap diam kalau transform & geometrinya tak berubah saat semua HIDUP dijalankan di beberapa waktu berbeda.
+// Yang ditandai userData.dinamis (properti stasiun yg dianimasikan pose(), partikel, dll.) tak pernah digabung.
+function gabungStatis(){
+  scene.updateMatrixWorld(true);
+  const calon = [];
+  scene.traverse(m => {
+    if (!m.isMesh || m.isInstancedMesh || Array.isArray(m.material) || m.material.transparent) return;
+    for (let p = m; p; p = p.parent){ if (!p.visible || p.userData.dinamis) return; }
+    calon.push({m, w: m.matrixWorld.clone(), v: m.geometry.attributes.position.version});
+  });
+  for (const t of [0.37, 2.71, 5.93]) for (const f of HIDUP) f(t, 0.016);
+  scene.updateMatrixWorld(true);
+  const diam = calon.filter(c => c.w.equals(c.m.matrixWorld) && c.v === c.m.geometry.attributes.position.version && c.m.visible);
+  const grup = new Map();
+  for (const {m} of diam){ const k = m.material.uuid + (m.castShadow ? 'c' : '') + (m.receiveShadow ? 'r' : ''); if (!grup.has(k)) grup.set(k, []); grup.get(k).push(m); }
+  let sebelum = 0, sesudah = 0;
+  for (const ms of grup.values()){
+    sebelum += ms.length; if (ms.length < 2){ sesudah += ms.length; continue; }
+    const geos = ms.map(m => { const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+      for (const k of Object.keys(g.attributes)) if (!['position','normal','uv'].includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2), 2));
+      g.morphAttributes = {}; g.clearGroups(); return g.applyMatrix4(m.matrixWorld); });
+    const gab = mergeGeometries(geos, false); if (!gab){ sesudah += ms.length; continue; }
+    const M = new THREE.Mesh(gab, ms[0].material); M.castShadow = ms[0].castShadow; M.receiveShadow = ms[0].receiveShadow; M.userData.statis = true;
+    scene.add(M); sesudah++;
+    for (const m of ms){ m.removeFromParent(); m.geometry.dispose(); }
+  }
+  console.debug(`desa: static batching ${sebelum} mesh -> ${sesudah}`);
+}
+
 // ═════ LOOP ═════
 const jamDunia = new THREE.Clock();
 let detikUI = 0;
-// ═════ MODE HEMAT: 30 fps, tanpa bayangan matahari, resolusi 1x, tanpa rumput. Pilihan diingat per browser. ═════
-const FPS_HEMAT = 30;
-let hemat = false, akum = 0;
-try { hemat = localStorage.getItem('desaHemat') === '1'; } catch (e) {}
-function terapkanHemat(){
-  renderer.setPixelRatio(hemat ? 1 : Math.min(devicePixelRatio, 2));
+// ═════ KUALITAS GRAFIS: Hemat / Normal / Ultra. Pilihan diingat per browser (localStorage desaKualitas). ═════
+// Hemat : 30 fps, tanpa post-processing, tanpa bayangan, resolusi 1x, tanpa rumput & partikel.
+// Normal: bayangan 2048, bloom + tilt-shift + grading, MSAA, resolusi maks 1.5x.
+// Ultra : Normal + GTAO (ambient occlusion) + bayangan 4096 + resolusi maks 2x.
+const FPS_HEMAT = 30, KUALITAS = ['normal', 'ultra', 'hemat'], NAMA_KUALITAS = {hemat:'Hemat', normal:'Normal', ultra:'Ultra'};
+let kualitas = 'normal', hemat = false, akum = 0;
+try { kualitas = localStorage.getItem('desaKualitas') || (localStorage.getItem('desaHemat') === '1' ? 'hemat' : 'normal'); } catch (e) {}
+if (!KUALITAS.includes(kualitas)) kualitas = 'normal';
+function terapkanKualitas(){
+  hemat = kualitas === 'hemat';
+  rasioPiksel = hemat ? 1 : Math.min(devicePixelRatio, kualitas === 'ultra' ? 2 : 1.5);
   matahari.castShadow = !hemat;
+  const peta = kualitas === 'ultra' ? 4096 : 2048;
+  if (matahari.shadow.mapSize.x !== peta){ matahari.shadow.mapSize.set(peta, peta); if (matahari.shadow.map){ matahari.shadow.map.dispose(); matahari.shadow.map = null; } }
+  FX.ao.enabled = kualitas === 'ultra';
   if (RUMPUT) RUMPUT.visible = !hemat;
-  $('bHemat').classList.toggle('on', hemat);
-  try { localStorage.setItem('desaHemat', hemat ? '1' : '0'); } catch (e) {}
+  for (const g of PARTIKEL) g.visible = !hemat;
+  const b = $('bHemat'); b.textContent = 'Grafis: ' + NAMA_KUALITAS[kualitas]; b.classList.toggle('on', hemat);
+  try { localStorage.setItem('desaKualitas', kualitas); localStorage.setItem('desaHemat', hemat ? '1' : '0'); } catch (e) {}
   ukuran();
 }
-$('bHemat').onclick = () => { hemat = !hemat; terapkanHemat(); $('saranHemat').style.display = 'none'; };
+$('bHemat').onclick = () => { kualitas = KUALITAS[(KUALITAS.indexOf(kualitas) + 1) % KUALITAS.length]; terapkanKualitas(); $('saranHemat').style.display = 'none'; };
 // saran otomatis: rata-rata < 40 fps selama 6 dtk (tab terlihat, belum hemat) -> tawarkan sekali per sesi halaman
 const pantauFps = {n:0, t:0, ditolak:false};
-$('bSaranYa').onclick = () => { hemat = true; terapkanHemat(); $('saranHemat').style.display = 'none'; };
+$('bSaranYa').onclick = () => { kualitas = 'hemat'; terapkanKualitas(); $('saranHemat').style.display = 'none'; };
 $('bSaranTidak').onclick = () => { pantauFps.ditolak = true; $('saranHemat').style.display = 'none'; };
 function cekFps(dtAsli){
   if (hemat || pantauFps.ditolak || document.visibilityState !== 'visible' || dtAsli > 0.5) return;
@@ -1159,7 +1276,7 @@ function loop(){
   else if (kam.fokusPos){ kam.target.lerp(kam.fokusPos, Math.min(1, dt*4)); if (kam.target.distanceTo(kam.fokusPos) < 0.05) kam.fokusPos = null; }
   kam.az += (kam.azTuju-kam.az)*Math.min(1, dt*7); kam.zoom += (kam.zoomTuju-kam.zoom)*Math.min(1, dt*8);
   labelR.domElement.classList.toggle('jauh', kam.zoom < 0.85); labelR.domElement.classList.toggle('dekat', kam.zoom > 1.5);
-  aturKamera();
+  aturKamera(); if (!hemat) aturBayangan();
   // agen
   for (const o of [...AGEN.values()]){ if (!o.data) continue; langkah(o, dt); pose(o, dt); if (o.hapus){ if (kam.fokus===o) kam.fokus=null; hapusAgenDunia(o); } }
   // percikan
@@ -1167,10 +1284,11 @@ function loop(){
   // dunia hidup: api, asap, bendera, bola sihir, burung, lampu untai, dst.
   const tt = performance.now()/1000;
   for (const f of HIDUP) f(tt, dt);
-  renderer.render(scene, camera); labelR.render(scene, camera);
+  if (hemat) renderer.render(scene, camera); else FX.c.render(dt);
+  labelR.render(scene, camera);
   detikUI += dt; if (detikUI > 1){ detikUI = 0; gambarDaftar(); if (pilihId) gambarDetail(); for (const o of AGEN.values()) if (o.data && o.data.status==='jalan') tulisLabel(o); }
 }
-terapkanHemat(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
+gabungStatis(); terapkanKualitas(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
 </script>
 </body>
 </html>
