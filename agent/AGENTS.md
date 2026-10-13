@@ -187,13 +187,16 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 
 | | Hemat | Normal (bawaan) | Ultra |
 |---|---|---|---|
-| Batas fps | 30 | tanpa batas | tanpa batas |
-| Resolusi | 1x | maks 1.5x | maks 2x |
+| Batas fps | 30 | 60 (di monitor >60 Hz) | 60 (di monitor >60 Hz) |
+| Resolusi | 1x | 1x, dinamis 60–100% | maks 1.5x, dinamis 60–100% |
+| MSAA (di composer) | - (antialias bawaan) | 2x | 4x |
 | Bayangan matahari | mati | 2048 | 4096 |
 | Bloom, tilt-shift, grading | mati | nyala | nyala |
 | Ambient occlusion (GTAO) | mati | mati | nyala |
 | Rumput, partikel (asap, bara, kunang-kunang, daun, burung, kertas melayang, rune) | mati | nyala | nyala |
 | Bayangan kontak karakter | nyala | nyala | nyala |
+
+**Resolusi dinamis** (`resolusiDinamis()`): di Normal dan Ultra, fps diukur tiap 1,5 detik. Di bawah 48 fps, resolusi render turun 10% (minimal 60%); di atas 57 fps, naik lagi 10%. Ada jeda 2 detik setelah setiap perubahan supaya tidak naik-turun terus. Frame yang lebih lama dari 0,25 detik (misalnya tab sempat tersembunyi) diabaikan. Skala yang sedang aktif tampil di kaki peta mini (misalnya `45 fps · 80%`).
 
 `localStorage.desaHemat` lama tetap dibaca (nilai `1` berarti Hemat) dan ikut ditulis supaya kompatibel. Siklus tombolnya: Normal → Ultra → Hemat → Normal.
 

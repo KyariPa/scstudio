@@ -133,14 +133,17 @@ Supaya tidak bolak-balik, ia baru pindah setelah tool-nya stabil 5 detik (`LEAD_
 
   | | Hemat | Normal (bawaan) | Ultra |
   |---|---|---|---|
-  | Batas fps | 30 | tanpa batas | tanpa batas |
-  | Resolusi | 1x | maks 1.5x | maks 2x |
+  | Batas fps | 30 | 60 | 60 |
+  | Resolusi | 1x | 1x, otomatis turun sampai 60% kalau fps < 48 | maks 1.5x, juga otomatis |
+  | Anti-aliasing (MSAA) | bawaan browser | 2x | 4x |
   | Bayangan | mati (hanya bayangan kontak) | 2048 | 4096 |
   | Bloom, tilt-shift, color grading | mati | nyala | nyala |
   | Ambient occlusion | mati | mati | nyala |
   | Rumput dan partikel | mati | nyala | nyala |
 
   Kalau rata-rata di bawah 40 fps selama 6 detik saat tab terlihat, desa menawarkan mode Hemat sekali.
+
+  Kalau terasa patah-patah, cek dulu GPU yang dipakai browser. Di laptop dengan dua GPU (misalnya AMD/Intel terintegrasi + NVIDIA), browser sering memakai GPU terintegrasi. Cek di `edge://gpu` atau `chrome://gpu` (baris GL_RENDERER). Untuk memaksa GPU diskrit: Windows Settings → System → Display → Graphics → pilih browser → High performance, lalu restart browser.
 
   Performa belum diukur di GPU sungguhan setelah upgrade ini. Lihat angka fps di peta mini untuk mengukurnya di mesinmu sendiri. Yang sudah terukur adalah jumlah draw call per frame, yaitu beban terbesar di sisi CPU: di mode Normal turun dari sekitar 1430 menjadi sekitar 690 (detail di `AGENTS.md` bagian 7).
 

@@ -115,7 +115,7 @@ details summary{cursor:pointer;color:#8a5a1e;font-size:12.5px;margin-top:8px;fon
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
   <button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
-  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: 30 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift. Ultra: + ambient occlusion, bayangan tajam.">Grafis: Normal</button>
+  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: 30 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift, maks 60 fps, resolusi dinamis. Ultra: + ambient occlusion, bayangan tajam, resolusi lebih tinggi.">Grafis: Normal</button>
   <span class="bantu">Drag geser · Scroll zoom · WASD · Q/E putar · M peta</span>
 </div>
 <div id="galat"></div>
@@ -1796,15 +1796,22 @@ const jamDunia = new THREE.Clock();
 let detikUI = 0;
 // ═════ KUALITAS GRAFIS: Hemat / Normal / Ultra. Pilihan diingat per browser (localStorage desaKualitas). ═════
 // Hemat : 30 fps, tanpa post-processing, tanpa bayangan, resolusi 1x, tanpa rumput & partikel.
-// Normal: bayangan 2048, bloom + tilt-shift + grading, MSAA, resolusi maks 1.5x.
-// Ultra : Normal + GTAO (ambient occlusion) + bayangan 4096 + resolusi maks 2x.
+// Normal: bayangan 2048, bloom + tilt-shift + grading, MSAA 2x, resolusi 1x, maks 60 fps.
+// Ultra : Normal + GTAO (ambient occlusion) + bayangan 4096 + MSAA 4x + resolusi maks 1.5x.
+// Normal & Ultra memakai RESOLUSI DINAMIS: kalau fps < 48, resolusi render turun bertahap (min 60%), naik lagi saat longgar.
 const FPS_HEMAT = 30, KUALITAS = ['normal', 'ultra', 'hemat'], NAMA_KUALITAS = {hemat:'Hemat', normal:'Normal', ultra:'Ultra'};
 let kualitas = 'normal', hemat = false, akum = 0;
+let rasioDasar = 1, skalaDinamis = 1;            // rasioPiksel = rasioDasar * skalaDinamis
+const DINAMIS = {t: 0, n: 0, tunda: 0};          // pengukur fps utk resolusi dinamis
+let vsync = 1/60;                                // interval rAF terukur (deteksi monitor >60 Hz)
 try { kualitas = localStorage.getItem('desaKualitas') || (localStorage.getItem('desaHemat') === '1' ? 'hemat' : 'normal'); } catch (e) {}
 if (!KUALITAS.includes(kualitas)) kualitas = 'normal';
 function terapkanKualitas(){
   hemat = kualitas === 'hemat';
-  rasioPiksel = hemat ? 1 : Math.min(devicePixelRatio, kualitas === 'ultra' ? 2 : 1.5);
+  rasioDasar = hemat ? 1 : Math.min(devicePixelRatio, kualitas === 'ultra' ? 1.5 : 1);
+  skalaDinamis = 1; rasioPiksel = rasioDasar; DINAMIS.t = DINAMIS.n = 0; DINAMIS.tunda = 2;
+  const sampel = kualitas === 'ultra' ? 4 : 2;   // MSAA composer; ganti jumlah sampel = buat ulang render target
+  for (const rt of [FX.c.renderTarget1, FX.c.renderTarget2]) if (rt.samples !== sampel){ rt.samples = sampel; rt.dispose(); }
   matahari.castShadow = !hemat;
   const peta = kualitas === 'ultra' ? 4096 : 2048;
   if (matahari.shadow.mapSize.x !== peta){ matahari.shadow.mapSize.set(peta, peta); if (matahari.shadow.map){ matahari.shadow.map.dispose(); matahari.shadow.map = null; } }
@@ -1829,7 +1836,10 @@ function cekFps(dtAsli){
 function loop(){
   requestAnimationFrame(loop);
   const dtAsli = jamDunia.getDelta(); akum += dtAsli; cekFps(dtAsli);
-  if (hemat && akum < 1/FPS_HEMAT - 0.002) return;   // lewati frame: batas 30 fps
+  if (dtAsli > 0 && dtAsli < 0.1) vsync += (dtAsli - vsync)*0.05;
+  // batas fps: Hemat 30; Normal/Ultra 60 di monitor >60 Hz (toleransi setengah vsync supaya monitor 60 Hz tak jatuh ke 30)
+  const batas = hemat ? 1/FPS_HEMAT - 0.002 : (vsync < 0.0125 ? 1/60 - vsync*0.5 : 0);
+  if (akum < batas) return;
   const dtR = akum, dt = Math.min(0.05, akum); akum = 0;
   // kamera halus
   const sp = 24*dt/kam.zoom;
@@ -1849,7 +1859,7 @@ function loop(){
   atmosfer(dt); suaraTik(dt);
   for (const f of HIDUP) f(tt, dt);
   if (hemat) renderer.render(scene, camera); else FX.c.render(dt);
-  petaTik(dtR);
+  petaTik(dtR); resolusiDinamis(dtR);
   labelR.render(scene, camera);
   detikUI += dt; if (detikUI > 1){ detikUI = 0; tulisTombolWaktu(); gambarDaftar(); if (pilihId) gambarDetail(); for (const o of AGEN.values()) if (o.data && o.data.status==='jalan') tulisLabel(o); }
 }
@@ -1919,9 +1929,20 @@ PETA.k.addEventListener('click', e => {
   const a = -kam.az, cu = u*Math.cos(a) - v*Math.sin(a), cv = u*Math.sin(a) + v*Math.cos(a);
   kam.fokus = null; kam.fokusPos = V(PETA.pusat.x + cu/sk, 0, PETA.pusat.z + cv/sk);
 });
+// resolusi dinamis: ukur fps tiap 1.5 dtk; < 48 -> turunkan resolusi 10%, > 57 -> naikkan 10% (histeresis, jeda 2 dtk setelah ganti)
+function resolusiDinamis(dtR){
+  if (hemat || document.visibilityState !== 'visible' || dtR > 0.25) return;
+  if (DINAMIS.tunda > 0){ DINAMIS.tunda -= dtR; return; }
+  DINAMIS.n++; DINAMIS.t += dtR; if (DINAMIS.t < 1.5) return;
+  const fps = DINAMIS.n/DINAMIS.t; DINAMIS.n = 0; DINAMIS.t = 0;
+  let baru = skalaDinamis;
+  if (fps < 48 && skalaDinamis > 0.6) baru = Math.max(0.6, skalaDinamis - 0.1);
+  else if (fps > 57 && skalaDinamis < 1) baru = Math.min(1, skalaDinamis + 0.1);
+  if (Math.abs(baru - skalaDinamis) > 0.01){ skalaDinamis = baru; rasioPiksel = rasioDasar*skalaDinamis; DINAMIS.tunda = 2; ukuran(); }
+}
 function petaTik(dtAsli){
   PETA.nFrame++; PETA.tFps += dtAsli;
-  if (PETA.tFps >= 1){ PETA.fps = PETA.nFrame/PETA.tFps; PETA.nFrame = 0; PETA.tFps = 0; $('petaFps').textContent = (PETA.fps < 10 ? PETA.fps.toFixed(1) : Math.round(PETA.fps)) + ' fps'; }
+  if (PETA.tFps >= 1){ PETA.fps = PETA.nFrame/PETA.tFps; PETA.nFrame = 0; PETA.tFps = 0; $('petaFps').textContent = (PETA.fps < 10 ? PETA.fps.toFixed(1) : Math.round(PETA.fps)) + ' fps' + (skalaDinamis < 0.99 && !hemat ? ` · ${Math.round(skalaDinamis*100)}%` : ''); }
   if ($('peta').style.display === 'none') return;
   PETA.t += dtAsli; if (PETA.t < 0.15) return; PETA.t = 0; gambarPeta();
 }
