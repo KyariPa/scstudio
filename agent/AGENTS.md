@@ -187,7 +187,7 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 
 | | Hemat | Normal (bawaan) | Ultra |
 |---|---|---|---|
-| Batas fps | 30 | 60 (di monitor >60 Hz) | 60 (di monitor >60 Hz) |
+| Batas fps | 60 (di monitor >60 Hz) | 60 (di monitor >60 Hz) | 60 (di monitor >60 Hz) |
 | Resolusi | 1x | 1x, dinamis 60–100% | maks 1.5x, dinamis 60–100% |
 | MSAA (di composer) | - (antialias bawaan) | 2x | 4x |
 | Bayangan matahari | mati | 2048 | 4096 |

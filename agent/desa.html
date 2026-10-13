@@ -115,7 +115,7 @@ details summary{cursor:pointer;color:#8a5a1e;font-size:12.5px;margin-top:8px;fon
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
   <button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
-  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: 30 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift, maks 60 fps, resolusi dinamis. Ultra: + ambient occlusion, bayangan tajam, resolusi lebih tinggi.">Grafis: Normal</button>
+  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: maks 60 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift, maks 60 fps, resolusi dinamis. Ultra: + ambient occlusion, bayangan tajam, resolusi lebih tinggi.">Grafis: Normal</button>
   <span class="bantu">Drag geser · Scroll zoom · WASD · Q/E putar · M peta</span>
 </div>
 <div id="galat"></div>
@@ -1795,11 +1795,11 @@ function gabungStatis(){
 const jamDunia = new THREE.Clock();
 let detikUI = 0;
 // ═════ KUALITAS GRAFIS: Hemat / Normal / Ultra. Pilihan diingat per browser (localStorage desaKualitas). ═════
-// Hemat : 30 fps, tanpa post-processing, tanpa bayangan, resolusi 1x, tanpa rumput & partikel.
+// Hemat : maks 60 fps, tanpa post-processing, tanpa bayangan, resolusi 1x, tanpa rumput & partikel.
 // Normal: bayangan 2048, bloom + tilt-shift + grading, MSAA 2x, resolusi 1x, maks 60 fps.
 // Ultra : Normal + GTAO (ambient occlusion) + bayangan 4096 + MSAA 4x + resolusi maks 1.5x.
 // Normal & Ultra memakai RESOLUSI DINAMIS: kalau fps < 48, resolusi render turun bertahap (min 60%), naik lagi saat longgar.
-const FPS_HEMAT = 30, KUALITAS = ['normal', 'ultra', 'hemat'], NAMA_KUALITAS = {hemat:'Hemat', normal:'Normal', ultra:'Ultra'};
+const KUALITAS = ['normal', 'ultra', 'hemat'], NAMA_KUALITAS = {hemat:'Hemat', normal:'Normal', ultra:'Ultra'};
 let kualitas = 'normal', hemat = false, akum = 0;
 let rasioDasar = 1, skalaDinamis = 1;            // rasioPiksel = rasioDasar * skalaDinamis
 const DINAMIS = {t: 0, n: 0, tunda: 0};          // pengukur fps utk resolusi dinamis
@@ -1837,8 +1837,8 @@ function loop(){
   requestAnimationFrame(loop);
   const dtAsli = jamDunia.getDelta(); akum += dtAsli; cekFps(dtAsli);
   if (dtAsli > 0 && dtAsli < 0.1) vsync += (dtAsli - vsync)*0.05;
-  // batas fps: Hemat 30; Normal/Ultra 60 di monitor >60 Hz (toleransi setengah vsync supaya monitor 60 Hz tak jatuh ke 30)
-  const batas = hemat ? 1/FPS_HEMAT - 0.002 : (vsync < 0.0125 ? 1/60 - vsync*0.5 : 0);
+  // batas 60 fps (semua mode) di monitor >60 Hz; toleransi setengah vsync supaya monitor 60 Hz tak jatuh ke 30
+  const batas = vsync < 0.0125 ? 1/60 - vsync*0.5 : 0;
   if (akum < batas) return;
   const dtR = akum, dt = Math.min(0.05, akum); akum = 0;
   // kamera halus

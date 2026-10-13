@@ -133,7 +133,7 @@ Supaya tidak bolak-balik, ia baru pindah setelah tool-nya stabil 5 detik (`LEAD_
 
   | | Hemat | Normal (bawaan) | Ultra |
   |---|---|---|---|
-  | Batas fps | 30 | 60 | 60 |
+  | Batas fps | 60 | 60 | 60 |
   | Resolusi | 1x | 1x, otomatis turun sampai 60% kalau fps < 48 | maks 1.5x, juga otomatis |
   | Anti-aliasing (MSAA) | bawaan browser | 2x | 4x |
   | Bayangan | mati (hanya bayangan kontak) | 2048 | 4096 |
