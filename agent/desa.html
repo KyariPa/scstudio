@@ -97,7 +97,7 @@ details summary{cursor:pointer;color:var(--emas);font-size:12.5px;margin-top:8px
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
   <button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
-  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bHemat" title="Kualitas grafis. Hemat: 30 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift. Ultra: + ambient occlusion, bayangan tajam.">Grafis: Normal</button>
+  <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: 30 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift. Ultra: + ambient occlusion, bayangan tajam.">Grafis: Normal</button>
   <span class="bantu">Drag geser · Scroll zoom · WASD · klik stickman</span>
 </div>
 <div id="galat"></div>
@@ -732,7 +732,7 @@ for (const d of [45, 135, 225, 315]){ const a = d*Math.PI/180, T = V(C5.x+Math.c
   for (let i=0;i<4;i++){ const A = tiang[i], B = tiang[(i+1)%4];
     for (let k=1;k<10;k++){ const u = k/10, x = A.x+(B.x-A.x)*u, z = A.z+(B.z-A.z)*u, y = 3.5 - Math.sin(u*Math.PI)*0.9;
       const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.11,0), emisif(warnaB[(i+k)%4], 1.8)); m.position.set(x,y,z); scene.add(m); bohlam.push(m); } }
-  HIDUP.push(t => { bohlam.forEach((m,i) => { m.material.emissiveIntensity = 1.2 + Math.max(0, Math.sin(t*2+i*0.9))*1.2; }); });
+  HIDUP.push(t => { bohlam.forEach((m,i) => { m.material.emissiveIntensity = (1.2 + Math.max(0, Math.sin(t*2+i*0.9))*1.2) * Math.max(0.7, SUASANA.lampu*0.75); }); });
 }
 tong(C5.x-7.5, C5.z-2); tong(C5.x-7.8, C5.z-0.7, 0.9); tong(C5.x-6.4, C5.z-1.6, 0.8); peti(C5.x+7.2, C5.z+2.5, 0, 0.4);
 { // dapur kedai: meja saji, kompor batu + panci beruap, rak toples, tenda bergaris
@@ -865,6 +865,138 @@ bangunPohon();
     dum.position.set(x, tinggi(x, z), z); dum.rotation.set(0, acak()*6, 0); dum.scale.setScalar(0.8+acak()*0.6); dum.updateMatrix(); bunga.setMatrixAt(nB, dum.matrix); bunga.setColorAt(nB++, c.setHex(wB[Math.floor(acak()*wB.length)])); }
   rumput.count = nR; bunga.count = nB;
   rumput.receiveShadow = true; bunga.castShadow = false; scene.add(rumput); scene.add(bunga); RUMPUT = rumput;
+}
+
+// ═════ ATMOSFER: siklus siang-malam, lampu malam, kunang-kunang, daun gugur, burung, suara ambience ═════
+// Jam desa: mode 'otomatis' = 1 menit nyata = 1 jam desa (siklus 24 menit); bisa dikunci Pagi/Siang/Senja/Malam (tombol Waktu).
+const MODE_WAKTU = ['otomatis', 'pagi', 'siang', 'senja', 'malam'], JAM_MODE = {pagi: 7.5, siang: 12.5, senja: 18.4, malam: 23};
+const NAMA_WAKTU = {otomatis: 'Otomatis', pagi: 'Pagi', siang: 'Siang', senja: 'Senja', malam: 'Malam'};
+let modeWaktu = 'otomatis';
+try { modeWaktu = localStorage.getItem('desaWaktu') || 'otomatis'; } catch (e) {}
+{ const m = /waktu=(\w+)/.exec(location.hash); if (m) modeWaktu = m[1]; }
+if (!MODE_WAKTU.includes(modeWaktu)) modeWaktu = 'otomatis';
+const C = h => new THREE.Color(h);
+// kunci suasana per jam: warna & kuat matahari/bulan, langit (hemisphere), kabut, eksposur, tint grading, lampu, malam (0..1)
+const KUNCI_JAM = [
+  {j: 0,    sun: C(0x8fa8ff), si: 0.55, sky: C(0x4a5a8a), gnd: C(0x1a2030), hi: 0.72, fog: C(0x1c2638), ex: 1.1, tint: [0.86, 0.93, 1.1],  lampu: 2.6, malam: 1},
+  {j: 5.2,  sun: C(0xa8a0d8), si: 0.6,  sky: C(0x6a6a98), gnd: C(0x2a2630), hi: 0.7,  fog: C(0x4a4a6a), ex: 1.05, tint: [0.94, 0.92, 1.04], lampu: 2.2, malam: 0.8},
+  {j: 6.8,  sun: C(0xffb880), si: 1.5,  sky: C(0xffd8b8), gnd: C(0x5a5a48), hi: 0.95, fog: C(0xd8b8a0), ex: 1.06, tint: [1.06, 0.98, 0.92], lampu: 0.9, malam: 0.15},
+  {j: 9,    sun: C(0xfff0d6), si: 2.1,  sky: C(0xfff4e0), gnd: C(0x5b7a52), hi: 1.15, fog: C(0x9fc5a8), ex: 1.08, tint: [1.03, 1.0, 0.95],  lampu: 0.5, malam: 0},
+  {j: 15.5, sun: C(0xfff0d6), si: 2.1,  sky: C(0xfff4e0), gnd: C(0x5b7a52), hi: 1.15, fog: C(0x9fc5a8), ex: 1.08, tint: [1.03, 1.0, 0.95],  lampu: 0.5, malam: 0},
+  {j: 17.6, sun: C(0xffa868), si: 1.7,  sky: C(0xffd0a0), gnd: C(0x6a5a48), hi: 0.95, fog: C(0xe8b890), ex: 1.06, tint: [1.09, 0.96, 0.86], lampu: 0.9, malam: 0.1},
+  {j: 19.2, sun: C(0xd07858), si: 0.8,  sky: C(0x8a6a8a), gnd: C(0x2a2430), hi: 0.72, fog: C(0x6a4a5a), ex: 1.05, tint: [1.0, 0.88, 0.94],  lampu: 2.1, malam: 0.65},
+  {j: 21,   sun: C(0x8fa8ff), si: 0.55, sky: C(0x4a5a8a), gnd: C(0x1a2030), hi: 0.72, fog: C(0x1c2638), ex: 1.1, tint: [0.86, 0.93, 1.1],  lampu: 2.6, malam: 1},
+  {j: 24,   sun: C(0x8fa8ff), si: 0.55, sky: C(0x4a5a8a), gnd: C(0x1a2030), hi: 0.72, fog: C(0x1c2638), ex: 1.1, tint: [0.86, 0.93, 1.1],  lampu: 2.6, malam: 1},
+];
+const LAMPU_MALAM = [V(0, 3.2, 5), V(AREA.Kedai.x, 3.5, AREA.Kedai.z), V(-11.5, 3, -0.6), V(0, 3, 62), V(AREA.Document.x, 3, AREA.Document.z)].map(p => {
+  const L = new THREE.PointLight(0xffb868, 0, 22, 1.5); L.position.copy(p); scene.add(L); return L; });
+const _cW = new THREE.Color();
+function jamDesa(){ return modeWaktu === 'otomatis' ? (Date.now()/60000 + 9) % 24 : JAM_MODE[modeWaktu]; }
+let jamHalus = null;
+function atmosfer(dt){
+  const target = jamDesa();
+  if (jamHalus === null) jamHalus = target;
+  let d = target - jamHalus; if (d > 12) d -= 24; if (d < -12) d += 24;   // transisi halus saat mode diganti
+  jamHalus = (jamHalus + d*Math.min(1, dt*1.5) + 24) % 24;
+  const j = jamHalus; SUASANA.jam = j;
+  let i = 0; while (KUNCI_JAM[i+1].j <= j) i++;
+  const a = KUNCI_JAM[i], b = KUNCI_JAM[i+1], t = halus(0, 1, (j - a.j)/(b.j - a.j));
+  matahari.color.lerpColors(a.sun, b.sun, t); matahari.intensity = campur(a.si, b.si, t);
+  hemi.color.lerpColors(a.sky, b.sky, t); hemi.groundColor.lerpColors(a.gnd, b.gnd, t); hemi.intensity = campur(a.hi, b.hi, t);
+  _cW.lerpColors(a.fog, b.fog, t); scene.fog.color.copy(_cW); scene.background.copy(_cW);
+  renderer.toneMappingExposure = campur(a.ex, b.ex, t);
+  FX.grade.uniforms.tint.value.setRGB(campur(a.tint[0], b.tint[0], t), campur(a.tint[1], b.tint[1], t), campur(a.tint[2], b.tint[2], t));
+  SUASANA.lampu = campur(a.lampu, b.lampu, t); SUASANA.malam = campur(a.malam, b.malam, t);
+  // arah cahaya: siang matahari menyapu timur->barat (tetap di sisi kamera supaya bayangan enak dilihat); malam = bulan tetap
+  const siang = Math.min(1, Math.max(0, (j - 5.5)/1.5)) * Math.min(1, Math.max(0, (20 - j)/1.5));
+  const az = 0.93 + (j - 12)/12*0.95, el = 0.35 + Math.max(0, Math.sin((j - 6)/12*Math.PI))*0.75;
+  const azB = 1.6, elB = 0.95;
+  ARAH_MATAHARI.set(Math.sin(campur(azB, az, siang))*Math.cos(campur(elB, el, siang)), Math.sin(campur(elB, el, siang)), Math.cos(campur(azB, az, siang))*Math.cos(campur(elB, el, siang))).normalize();
+  if (hemat){ matahari.position.copy(ARAH_MATAHARI).multiplyScalar(100); matahari.target.position.set(0, 0, 0); }
+  AWAN_KUAT.value = 0.22*(1 - SUASANA.malam*0.8);
+  JENDELA.emissiveIntensity = 0.2 + SUASANA.malam*2.4;
+  for (const L of LAMPU_MALAM) L.intensity = SUASANA.malam*16;
+}
+
+// kunang-kunang (malam): titik bercahaya melayang di sekitar kolam, pohon & area
+const TEX_GLOW = new THREE.CanvasTexture(kanvas(32, (c, n) => { const g = c.createRadialGradient(n/2, n/2, 0, n/2, n/2, n/2); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,.5)'); g.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = g; c.fillRect(0, 0, n, n); }));
+{ const G = grupPartikel(), N = 150, pos = new Float32Array(N*3), dasar = [];
+  const pusat = [V(KOLAM.x, 0, KOLAM.z), V(0, 0, 20), AREA.Kedai, AREA.Document, AREA.Tester, V(-20, 0, 30), V(20, 0, -6), V(40, 0, 60), V(-45, 0, 60)];
+  for (let i = 0; i < N; i++){ const c = pusat[i % pusat.length], a = acak()*6.28, r = 2 + acak()*12; dasar.push({x: c.x + Math.cos(a)*r, z: c.z + Math.sin(a)*r, y: 0.6 + acak()*2.4, f: acak()*9, k: 0.4 + acak()*0.8}); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const m = new THREE.PointsMaterial({color: new THREE.Color(2.4, 3.2, 1.1), size: 7, sizeAttenuation: false, map: TEX_GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0});
+  const titik = new THREE.Points(g, m); titik.frustumCulled = false; G.add(titik);
+  HIDUP.push(t => { if (!G.visible) return; m.opacity = Math.max(0, SUASANA.malam - 0.2)*1.25; titik.visible = m.opacity > 0.01; if (!titik.visible) return;
+    for (let i = 0; i < N; i++){ const d = dasar[i]; pos[i*3] = d.x + Math.sin(t*0.5*d.k + d.f)*1.6; pos[i*3+1] = d.y + Math.sin(t*1.3*d.k + d.f*2)*0.5; pos[i*3+2] = d.z + Math.cos(t*0.4*d.k + d.f)*1.6; }
+    g.attributes.position.needsUpdate = true; m.size = 5 + Math.sin(t*3)*1.5; });
+}
+// daun gugur di sekitar kamera: InstancedMesh kecil, jatuh berayun dari tajuk pohon terdekat
+{ const G = grupPartikel(), N = 46, dum = new THREE.Object3D(), c = new THREE.Color();
+  const g = new THREE.PlaneGeometry(0.24, 0.17); g.translate(0.06, 0, 0);
+  const M = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({color: 0xffffff, side: THREE.DoubleSide, roughness: .8}), N); M.frustumCulled = false; G.add(M);
+  const daun = Array.from({length: N}, (_, i) => ({umur: -acak()*8, p: V(0,0,0), f: acak()*9, laju: 0.5 + acak()*0.5}));
+  daun.forEach((d, i) => M.setColorAt(i, c.setHex([0x7ab04a, 0xc9b040, 0xd8843a, 0x9ac050, 0xb86a30][i % 5])));
+  const lahir = d => { const dekat = POHON.filter(p => Math.abs(p.x - kam.target.x) < 45 && Math.abs(p.z - kam.target.z) < 45);
+    const p = dekat.length ? dekat[Math.floor(acak()*dekat.length)] : {x: kam.target.x + (acak()-.5)*40, z: kam.target.z + (acak()-.5)*40, y: 0, s: 1};
+    d.p.set(p.x + (acak()-.5)*2.4*p.s, p.y + (2.6 + acak()*1.6)*p.s, p.z + (acak()-.5)*2.4*p.s); d.umur = 0; };
+  HIDUP.push((t, dt) => { if (!G.visible) return;
+    daun.forEach((d, i) => { d.umur += dt; if (d.umur < 0){ dum.scale.setScalar(0); } else {
+      if (!d.hidup || d.p.y <= tinggi(d.p.x, d.p.z) + 0.05 || d.umur > 14){ lahir(d); d.hidup = true; }
+      d.p.y -= dt*d.laju; d.p.x += Math.sin(t*1.7 + d.f)*dt*0.9 + dt*0.35; d.p.z += Math.cos(t*1.3 + d.f)*dt*0.6;
+      dum.position.copy(d.p); dum.rotation.set(Math.sin(t*3 + d.f)*1.2, t*2 + d.f, Math.cos(t*2.5 + d.f)*0.8); dum.scale.setScalar(1); }
+      dum.updateMatrix(); M.setMatrixAt(i, dum.matrix); });
+    M.instanceMatrix.needsUpdate = true; });
+}
+// burung: kawanan kecil terbang melintasi desa sesekali (siang saja)
+{ const G = grupPartikel(), N = 6, bs = [];
+  for (let i = 0; i < N; i++){ const b = new THREE.Group(); G.add(b); kotak(0.35, 0.14, 0.14, 0x3a3a44, 0, 0, 0, b).castShadow = true; bola(0.09, 0x3a3a44, 0.2, 0.05, 0, b);
+    const sayap = [-1, 1].map(s => { const w = new THREE.Group(); w.position.z = s*0.06; b.add(w); const k = kotak(0.22, 0.03, 0.55, 0x4a4a54, 0, 0, s*0.27, w); k.castShadow = true; return w; });
+    bs.push({b, sayap, o: V(-(i % 2 ? 1 : 0)*(1 + i*0.6), Math.sin(i)*0.6, (i % 2 ? 1 : -1)*(0.8 + i*0.5))}); }
+  let mulai = -20, dari = V(0,0,0), arah = V(1,0,0);
+  HIDUP.push((t, dt) => { if (!G.visible) return;
+    const u = t - mulai;
+    if (u > 34 || u < 0){ if (SUASANA.malam > 0.5){ mulai = t; G.position.y = -100; return; }
+      const a = acak()*6.28; arah.set(Math.cos(a), 0, Math.sin(a)); dari.set(kam.target.x - arah.x*70, 15 + acak()*5, kam.target.z - arah.z*70); mulai = t; }
+    G.position.copy(dari).addScaledVector(arah, (t - mulai)*4.2); G.rotation.y = Math.atan2(-arah.z, arah.x);
+    bs.forEach((x, i) => { x.b.position.copy(x.o); x.b.position.y += Math.sin(t*2 + i)*0.3; const f = Math.sin(t*12 + i*1.3)*0.7; x.sayap[0].rotation.x = f; x.sayap[1].rotation.x = -f; }); });
+}
+
+// suara ambience (WebAudio, prosedural, default MATI): angin, burung (siang), jangkrik (malam), api, denting palu
+const SUARA = {ctx: null, aktif: false, master: null, angin: null, tAcara: 0};
+function mulaiSuara(){
+  if (!SUARA.ctx){
+    const Ac = window.AudioContext || window.webkitAudioContext; if (!Ac) return false;
+    const c = SUARA.ctx = new Ac(); SUARA.master = c.createGain(); SUARA.master.gain.value = 0.55; SUARA.master.connect(c.destination);
+    const buf = c.createBuffer(1, c.sampleRate*2, c.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random()*2 - 1;
+    SUARA.derau = buf;
+    const src = c.createBufferSource(); src.buffer = buf; src.loop = true;
+    const f = c.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = 0.5;
+    SUARA.angin = c.createGain(); SUARA.angin.gain.value = 0.05; src.connect(f).connect(SUARA.angin).connect(SUARA.master); src.start();
+  }
+  SUARA.ctx.resume(); return true;
+}
+function nada(frek, mulai, lama, vol, tipe = 'sine', frek2 = null){
+  const c = SUARA.ctx, o = c.createOscillator(), g = c.createGain(); o.type = tipe; o.frequency.setValueAtTime(frek, mulai);
+  if (frek2) o.frequency.exponentialRampToValueAtTime(frek2, mulai + lama*0.8);
+  g.gain.setValueAtTime(0.0001, mulai); g.gain.exponentialRampToValueAtTime(vol, mulai + 0.012); g.gain.exponentialRampToValueAtTime(0.0001, mulai + lama);
+  o.connect(g).connect(SUARA.master); o.start(mulai); o.stop(mulai + lama + 0.05);
+}
+function letupan(mulai, lama, vol, frek = 1800){   // derau pendek (api berderak, ayunan pedang)
+  const c = SUARA.ctx, s = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); s.buffer = SUARA.derau; f.type = 'bandpass'; f.frequency.value = frek; f.Q.value = 1.2;
+  g.gain.setValueAtTime(vol, mulai); g.gain.exponentialRampToValueAtTime(0.0001, mulai + lama); s.connect(f).connect(g).connect(SUARA.master); s.start(mulai, Math.random()*1.5, lama + 0.05);
+}
+const volDari = p => { const d = Math.hypot(p.x - kam.target.x, p.z - kam.target.z); return Math.max(0, 1 - d/(30/kam.zoom + 8)); };
+function bunyiDenting(p){ if (!SUARA.aktif) return; const v = volDari(p)*0.16; if (v < 0.005) return; const t = SUARA.ctx.currentTime; nada(1850, t, 0.55, v); nada(2790, t, 0.35, v*0.6); nada(4100, t, 0.18, v*0.3); }
+function bunyiTebas(p){ if (!SUARA.aktif) return; const v = volDari(p)*0.12; if (v < 0.005) return; letupan(SUARA.ctx.currentTime, 0.16, v, 2600); }
+function suaraTik(dt){
+  if (!SUARA.aktif) return;
+  const c = SUARA.ctx, t = c.currentTime, malam = SUASANA.malam;
+  SUARA.angin.gain.setTargetAtTime(0.035 + 0.03*(Math.sin(t*0.13) + 1)/2, t, 0.5);
+  if ((SUARA.tAcara -= dt) > 0) return;
+  SUARA.tAcara = 0.25 + Math.random()*0.5;
+  if (malam < 0.5 && Math.random() < 0.18){ const f = 2600 + Math.random()*1400, n = 2 + Math.floor(Math.random()*4); for (let i = 0; i < n; i++) nada(f*(1 + (i%2)*0.12), t + i*0.11, 0.09, 0.025, 'sine', f*1.25); }
+  if (malam > 0.4 && Math.random() < 0.6){ for (let i = 0; i < 3; i++) nada(4300 + Math.random()*200, t + i*0.045, 0.03, 0.012*malam, 'triangle'); }
+  for (const p of [TUNGKU, AREA.Kedai]){ const v = volDari(p); if (v > 0.05 && Math.random() < 0.7) letupan(t + Math.random()*0.2, 0.05 + Math.random()*0.06, 0.05*v, 900 + Math.random()*1500); }
 }
 
 // ═════ STASIUN KERJA (slot) ═════
@@ -1346,7 +1478,7 @@ function pose(o, dt){
       s.al.palu.visible = true; const p = (t % 0.95)/0.95;
       const ang = p < 0.65 ? -0.6 - (p/0.65)*2.3 : -2.9 + ((p-0.65)/0.35)*2.3;
       s.bahuK.rotation.x = ang; s.bahuKi.rotation.x = -0.5; s.pinggul.rotation.x = 0.12; s.leher.rotation.x = 0.25;
-      if (p >= 0.97 && o.ketukT !== Math.floor(t/0.95)){ o.ketukT = Math.floor(t/0.95); if (slot?.prop) semburPercik(slot.prop.clone().setY(0.95), 9); }
+      if (p >= 0.97 && o.ketukT !== Math.floor(t/0.95)){ o.ketukT = Math.floor(t/0.95); if (slot?.prop){ semburPercik(slot.prop.clone().setY(0.95), 9); bunyiDenting(slot.prop); } }
       break; }
     case 'panas': { const f = Math.sin(t*4); s.bahuK.rotation.x = -1.2+f*0.45; s.bahuKi.rotation.x = -1.2+f*0.45; s.pinggul.rotation.x = 0.18+f*0.05; s.al.tongkat.visible = true; break; }
     case 'celup': { const f = (Math.sin(t*1.6)+1)/2; s.pinggul.rotation.x = 0.35+f*0.25; s.bahuK.rotation.x = -0.4-f*0.3; s.bahuKi.rotation.x = -0.4-f*0.3; s.leher.rotation.x = 0.4; s.al.palu.visible = true; break; }
@@ -1355,7 +1487,7 @@ function pose(o, dt){
       s.al.pedang.visible = true; const p = (t % 1.2)/1.2;
       s.bahuK.rotation.x = p < 0.6 ? -2.4+p*0.6 : -2.04 + (p-0.6)/0.4*1.7; s.bahuK.rotation.z = p < 0.6 ? 0.4 : 0.4-(p-0.6)*1.5;
       s.bahuKi.rotation.x = -0.6; s.pinggul.rotation.y = p<0.6 ? 0.25 : 0.25-(p-0.6)*1.3; s.pahaK.rotation.x = -0.25; s.pahaKi.rotation.x = 0.25;
-      if (slot?.obj){ slot.obj.rotation.z = p>0.75 ? Math.sin((p-0.75)*30)*0.2*(1-p) : slot.obj.rotation.z*0.9; if (p>0.75 && o.ketukT !== Math.floor(t/1.2)){ o.ketukT = Math.floor(t/1.2); semburPercik(slot.prop.clone().setY(1.5), 5); } }
+      if (slot?.obj){ slot.obj.rotation.z = p>0.75 ? Math.sin((p-0.75)*30)*0.2*(1-p) : slot.obj.rotation.z*0.9; if (p>0.75 && o.ketukT !== Math.floor(t/1.2)){ o.ketukT = Math.floor(t/1.2); semburPercik(slot.prop.clone().setY(1.5), 5); bunyiTebas(slot.prop); } }
       break; }
     case 'teropong': { s.al.teropong.visible = true; s.bahuK.rotation.x = -2.5; s.bahuK.rotation.z = -0.45; s.bahuKi.rotation.x = -0.3; s.leher.rotation.x = -0.25; s.pinggul.rotation.y = Math.sin(t*0.6)*0.5; break; }
     case 'tulis': { s.al.pena.visible = true; s.bahuK.rotation.x = -0.95+Math.sin(t*7)*0.08; s.bahuK.rotation.z = Math.sin(t*3.5)*0.15; s.bahuKi.rotation.x = -0.8; s.leher.rotation.x = 0.45; s.pinggul.rotation.x = 0.15; break; }
@@ -1641,16 +1773,22 @@ function loop(){
   // percikan
   for (let i=percikan.length-1;i>=0;i--){ const p=percikan[i]; p.umur-=dt; p.v.y-=14*dt; p.m.position.addScaledVector(p.v, dt); if (p.umur<=0 || p.m.position.y<0){ scene.remove(p.m); percikan.splice(i,1);} }
   // dunia hidup: api, asap, bendera, bola sihir, burung, lampu untai, dst.
-  const tt = performance.now()/1000;
+  const tt = performance.now()/1000; WAKTU.value = tt;
+  atmosfer(dt); suaraTik(dt);
   for (const f of HIDUP) f(tt, dt);
   if (hemat) renderer.render(scene, camera); else FX.c.render(dt);
   labelR.render(scene, camera);
-  detikUI += dt; if (detikUI > 1){ detikUI = 0; gambarDaftar(); if (pilihId) gambarDetail(); for (const o of AGEN.values()) if (o.data && o.data.status==='jalan') tulisLabel(o); }
+  detikUI += dt; if (detikUI > 1){ detikUI = 0; tulisTombolWaktu(); gambarDaftar(); if (pilihId) gambarDetail(); for (const o of AGEN.values()) if (o.data && o.data.status==='jalan') tulisLabel(o); }
 }
+function tulisTombolWaktu(){ const j = SUASANA.jam, hh = Math.floor(j), mm = Math.floor((j - hh)*60);
+  $('bWaktu').textContent = `${NAMA_WAKTU[modeWaktu]} ${String(hh).padStart(2,'0')}.${String(mm).padStart(2,'0')}`; $('bWaktu').classList.toggle('on', modeWaktu !== 'otomatis'); }
+$('bWaktu').onclick = () => { modeWaktu = MODE_WAKTU[(MODE_WAKTU.indexOf(modeWaktu) + 1) % MODE_WAKTU.length]; try { localStorage.setItem('desaWaktu', modeWaktu); } catch (e) {} tulisTombolWaktu(); };
+$('bSuara').onclick = () => { SUARA.aktif = !SUARA.aktif && mulaiSuara(); if (!SUARA.aktif && SUARA.ctx) SUARA.ctx.suspend();
+  $('bSuara').textContent = 'Suara: ' + (SUARA.aktif ? 'Nyala' : 'Mati'); $('bSuara').classList.toggle('on', SUARA.aktif); };
 // hash URL opsional: #kam=x,z[,zoom[,putaran]] -> posisi kamera awal (pintasan & uji visual), mis. /desa#kam=-34,8,1.6
 { const m = /kam=(-?[\d.]+),(-?[\d.]+)(?:,([\d.]+))?(?:,(-?\d+))?/.exec(location.hash);
   if (m){ kam.target.set(+m[1], 0, +m[2]); if (m[3]) kam.zoom = kam.zoomTuju = Math.min(3.2, Math.max(0.4, +m[3])); if (m[4]) kam.az = kam.azTuju = Math.PI/4 + (+m[4])*Math.PI/2; } }
-gabungStatis(); terapkanKualitas(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
+gabungStatis(); terapkanKualitas(); atmosfer(1); tulisTombolWaktu(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
 </script>
 </body>
 </html>
