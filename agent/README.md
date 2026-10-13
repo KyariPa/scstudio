@@ -3,7 +3,7 @@
 Pantau pekerjaan Claude Code secara live dari browser: subagen yang sedang jalan, dan juga sesi utama yang mengerjakan tugas langsung tanpa agen. Ada dua tampilan:
 
 - **Dashboard** (`/`): tabel agen dan sesi yang jalan, menunggu, diam, dan selesai. Isinya peran, durasi, estimasi, tool terakhir, laporan, tugas lengkap, dan riwayat tugas sesi utama.
-- **Desa Agen** (`/desa`): desa RPG 3D low-poly dengan kamera miring ala Ragnarok atau Harvest Moon. Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya. Gerakannya mengikuti tool yang sedang ia pakai, jadi agen yang sedang mengedit kode terlihat menempa di landasan.
+- **Desa Agen** (`/desa`): desa RPG 3D bergaya diorama HD dengan kamera miring ala Ragnarok atau Harvest Moon. Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya. Gerakannya mengikuti tool yang sedang ia pakai, jadi agen yang sedang mengedit kode terlihat menempa di landasan. Ada siklus siang-malam, sungai, kunang-kunang, suara ambience opsional, dan peta mini.
 
 > Untuk asisten AI yang memakai atau mengubah folder ini, ada panduan khusus di [`AGENTS.md`](AGENTS.md). Isinya penempatan, konvensi, peta kode, resep perubahan, jebakan yang sudah diketahui, dan cara menguji. `CLAUDE.md` otomatis mengarahkan Claude Code ke panduan itu.
 
@@ -30,7 +30,7 @@ Tidak perlu login atau API key. Server membaca transkrip Claude Code milik siapa
 - **Data kosong:** kalau folder transkrip tidak ada, atau ada tapi belum berisi transkrip sesi, dashboard dan desa menampilkan peringatan berisi path yang sedang dibaca. Peringatan yang sama juga dicetak di konsol saat server mulai. Jadi tampilan kosong karena salah folder bisa dibedakan dari tampilan kosong karena memang belum ada agen yang jalan.
 - **Hanya diuji di satu lingkungan:** format transkrip adalah format internal Claude Code. Kode ini diuji di Claude Code 2.1.295 lewat aplikasi desktop Windows. Versi lain atau CLI di Mac/Linux mungkin perlu penyesuaian.
 
-Syaratnya Python 3.9 ke atas, tanpa paket tambahan. Halaman `/desa` memuat Three.js 0.160 dari CDN jsdelivr, jadi butuh internet.
+Syaratnya Python 3.9 ke atas, tanpa paket tambahan. Halaman `/desa` memuat Three.js 0.160 beserta addon post-processing-nya dari CDN jsdelivr, jadi butuh internet. Semua tekstur dibuat prosedural di browser, tanpa file aset.
 
 ## Sumber data
 
@@ -82,18 +82,20 @@ Peran **Lead** tidak dipakai lewat awalan. Peran ini otomatis diberikan ke sesi 
 
 ## Desa Agen
 
-Tidak ada rumah. Tiap peran langsung punya area kerja terbuka yang hidup:
+Tidak ada rumah warga. Tiap peran langsung punya area kerja terbuka yang hidup, dan di tengah desa berdiri Aula Guild:
 
 | Area | Isi |
 |---|---|
-| Pandai Besi (Dev) | tungku menyala, cerobong berasap, bara melayang, ubupan memompa, landasan di tunggul, palung celup, rak senjata |
-| Perpustakaan (QA) | bola sihir melayang dengan cincin rune, buku terbang, mimbar melingkar, rak buku, lilin, globe |
-| Arena Tebas (Tester) | pasir berpagar, boneka melingkar, target panah, bendera berkibar, rak perisai, jerami |
-| Juru Tulis (Document) | dek kayu, meja dengan tinta dan lilin, jemuran kertas berayun, kotak surat, kandang merpati dengan burung terbang |
-| Kedai | api unggun, meja dan bangku melingkar, lampu untai berkelip |
+| Pandai Besi (Dev) | tungku menyala dengan atap peneduh, cerobong berasap, bara melayang, ubupan memompa, landasan di tunggul, palung celup, rak senjata, perkakas tergantung, gerinda berputar |
+| Perpustakaan (QA) | bola sihir melayang dengan cincin dan rune bercahaya, buku terbang, mimbar melingkar, rak buku, rak gulungan, kandil, lilin, globe |
+| Arena Tebas (Tester) | pasir berpagar, boneka melingkar, target panah, umbul-umbul berkibar, bendera, rak perisai, jerami |
+| Juru Tulis (Document) | dek kayu, meja dengan tinta dan lilin, kertas melayang, jemuran kertas berayun, kotak surat, kandang merpati dengan burung terbang |
+| Kedai | api unggun, meja dan bangku melingkar, lampu untai berkelip, dapur dengan kompor batu dan panci beruap |
 | Balai Guild | papan misi beratap, bendera |
+| Aula Guild | bangunan utama kayu-plester: serambi bertiang, spanduk, jendela yang menyala di malam hari, menara jam yang jarumnya mengikuti jam desa |
+| Pinggir desa | sungai berair beranimasi dengan jembatan kayu, kolam dengan teratai, ladang sayur dengan orang-orangan sawah, pagar, lentera jalan, bukit landai |
 
-Animasi dunianya didaftarkan di array `HIDUP` (fungsi `f(t, dt)` yang dipanggil tiap frame). Rumput dan bunga memakai `InstancedMesh`, dan penempatannya menjauhi area kerja serta jalan (`bebas()`).
+Animasi dunianya didaftarkan di array `HIDUP` (fungsi `f(t, dt)` yang dipanggil tiap frame). Pohon, rumput, dan bunga memakai `InstancedMesh` dan bergoyang tertiup angin lewat shader. Penempatannya menjauhi area kerja, jalan, dan air (`bebas()`).
 
 **Ketua Guild (Lead)** memakai mahkota emas dan jubah merah. Ia berpindah area mengikuti tool terakhir sesi utama:
 
@@ -115,25 +117,32 @@ Supaya tidak bolak-balik, ia baru pindah setelah tool-nya stabil 5 detik (`LEAD_
   - Read / Grep: membaca buku.
   - Screenshot: meneropong.
   - Diam: berbaring tidur dengan "z Z z".
+- **Karakter:** chibi dengan shading halus, rim light, bayangan kontak, mata yang berkedip, napas saat diam, dan gaya jalan yang luwes.
 - **Siklus hidup:** agen baru muncul di gerbang lalu berjalan ke areanya. Agen yang selesai menyerahkan laporan di papan Balai Guild, duduk di kedai selama 10 menit, lalu pulang.
-- **Kontrol:** drag untuk menggeser, scroll untuk zoom, WASD, Q/E memutar kamera 90°. Klik agen di daftar atau di peta untuk memindahkan kamera ke sana dan membuka panel detail.
+- **Kontrol:**
+  - drag untuk menggeser, scroll untuk zoom, WASD, Q/E memutar kamera 90°;
+  - klik agen di daftar atau di peta untuk memindahkan kamera ke sana dan membuka panel detail;
+  - arahkan kursor ke agen, slime, atau kertas Quest untuk melihat tooltip;
+  - M menyembunyikan atau menampilkan peta mini.
+- **Peta mini** (kanan bawah): area, agen per warna peran, slime FAIL, dan kotak pandang kamera. Peta ikut berputar bersama kamera. Klik untuk terbang ke titik itu. Di bawahnya ada jam desa dan angka fps.
+- **Waktu:** tombol Waktu memilih Otomatis (1 menit nyata = 1 jam desa, siklus 24 menit) atau mengunci Pagi / Siang / Senja / Malam. Di malam hari lentera, jendela aula, dan lampu kedai menyala, dan kunang-kunang keluar. Pilihannya tersimpan di browser.
+- **Suara:** tombol Suara (bawaan mati) memainkan ambience yang dibuat di browser: angin, burung di siang hari, jangkrik di malam hari, api berderak, denting palu pandai besi, dan ayunan pedang. Volumenya mengikuti jarak dari kamera.
 - **Demo:** tombol Demo memunculkan 6 agen tiruan, berguna saat tidak ada agen yang jalan.
-- **Mode hemat:** tombol Hemat menurunkan beban grafis. Pilihannya tersimpan per browser di `localStorage`. Isinya:
-  - render dibatasi 30 fps;
-  - bayangan matahari dimatikan;
-  - resolusi render 1x, tanpa pengali HiDPI;
-  - rumput disembunyikan.
+- **Pintasan URL:** `/desa#kam=-34,8,1.6` membuka kamera di titik x=-34, z=8 dengan zoom 1.6. Tambahkan `&waktu=malam` untuk langsung melihat malam.
+- **Kualitas grafis:** tombol Grafis berputar Normal → Ultra → Hemat. Pilihannya tersimpan per browser.
 
-  Kalau rata-rata di bawah 40 fps selama 6 detik saat tab terlihat, desa menawarkan mode ini sekali.
+  | | Hemat | Normal (bawaan) | Ultra |
+  |---|---|---|---|
+  | Batas fps | 30 | tanpa batas | tanpa batas |
+  | Resolusi | 1x | maks 1.5x | maks 2x |
+  | Bayangan | mati (hanya bayangan kontak) | 2048 | 4096 |
+  | Bloom, tilt-shift, color grading | mati | nyala | nyala |
+  | Ambient occlusion | mati | mati | nyala |
+  | Rumput dan partikel | mati | nyala | nyala |
 
-  Hasil ukur di 1920x1080 dengan semua area terlihat:
+  Kalau rata-rata di bawah 40 fps selama 6 detik saat tab terlihat, desa menawarkan mode Hemat sekali.
 
-  | Mode | Render | Frame lambat (p95) |
-  |---|---|---|
-  | Normal | ~57 fps, dengan bayangan | 25 ms |
-  | Hemat | 30 fps, tanpa bayangan | loop browser tetap lancar, 8,5 ms |
-
-  Server sendiri ringan: sekitar 33 MB RAM dan ~3% dari satu inti CPU.
+  Performa belum diukur di GPU sungguhan setelah upgrade ini. Lihat angka fps di peta mini untuk mengukurnya di mesinmu sendiri. Yang sudah terukur adalah jumlah draw call per frame, yaitu beban terbesar di sisi CPU: angka sebelum dan sesudah ada di `AGENTS.md` bagian 7.
 
 ## Catatan bersama antar sesi
 
@@ -211,5 +220,6 @@ Data QA dimuat ulang tiap 30 detik. Papan dan slime hanya dibangun ulang kalau a
 - Yang tampil hanya subagen dan sesi utama di komputer ini. Perintah background Bash tidak ikut. Sesi cloud (claude.ai/code) juga tidak bisa terbaca, karena transkripnya ada di container jarak jauh, bukan di disk lokal.
 - Riwayat tugas sesi utama hanya mencakup 8 MB terakhir transkrip.
 - Kalau tab browser tidak sedang dibuka, animasi diperlambat browser dan berjalan normal lagi saat tab dibuka.
+- Mode Ultra (ambient occlusion dan bayangan 4096) cukup berat. Pakai Normal kalau fps di peta mini turun di bawah 50.
 - Respons HTTP sengaja ditulis per 16 KB, plus `TCP_NODELAY` dan `Connection: close`. Di Windows, satu write lebih dari ~60 KB pernah macet sekitar 19 detik. Jangan digabung lagi jadi satu write.
 - Karakter berdiri di samping propertinya supaya gerakannya terlihat dari profil. Kalau berdiri di belakang, gerakannya tertutup properti.

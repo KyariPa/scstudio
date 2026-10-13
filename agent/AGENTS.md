@@ -11,7 +11,7 @@ Dashboard Agen adalah server Python stdlib kecil yang **membaca transkrip Claude
 | URL | Isi |
 |---|---|
 | `/` | tabel dashboard: subagen dan sesi utama, status, durasi, estimasi, tool terakhir, laporan |
-| `/desa` | Desa Agen: desa RPG 3D low-poly (Three.js). Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya, dan animasinya mengikuti tool yang sedang ia pakai. Ada juga Papan Quest QA (test case) dan slime FAIL. |
+| `/desa` | Desa Agen: desa RPG 3D bergaya diorama HD (Three.js + post-processing). Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya, dan animasinya mengikuti tool yang sedang ia pakai. Ada juga Papan Quest QA (test case), slime FAIL, siklus siang-malam, dan peta mini. |
 | `/catatan` | catatan bersama antar sesi Claude (teks markdown) |
 
 Yang dibaca:
@@ -24,7 +24,7 @@ Yang dibaca:
 
 Satu-satunya file yang **ditulis** server adalah `<CLAUDE_DIR>/catatan-bersama.md` (tiap 15 detik). Selain itu server tidak mengubah apa pun, dan hanya mendengar di `127.0.0.1`.
 
-Tidak ada build step, tidak ada dependensi pip, tidak ada npm. Three.js 0.160.0 dimuat lewat importmap dari jsdelivr, jadi halaman desa butuh internet.
+Tidak ada build step, tidak ada dependensi pip, tidak ada npm. Three.js 0.160.0 (plus addon `examples/jsm`: postprocessing dan `BufferGeometryUtils`) dimuat lewat importmap dari jsdelivr, jadi halaman desa butuh internet. Semua tekstur dibuat prosedural di canvas, tanpa file aset.
 
 ---
 
@@ -156,19 +156,46 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 
 | Penanda `// ═════` | Isi |
 |---|---|
-| KONFIG | `SIMPAN_MENIT` (agen selesai duduk di kedai), `POLL_MS`, `LAJU`, `SKALA_ORANG`, `WARNA` per peran, `LEAD_TAHAN`, `AKTIVITAS` (teks gelembung) |
-| RENDERER, SCENE, KAMERA | kamera ortografis miring (`kam.az` / `el` / `zoom`, `VIEW`), `aturKamera`, `ukuran` |
-| MATERIAL & HELPER | `mat()` (cache), `kotak`, `silinder`, `labelDunia` (CSS2D) |
-| DUNIA | `HIDUP[]` = animasi dunia `f(t, dt)` per frame. Helper: `alas`, `jalan`, `api`, `asapDari`, `baraLayang`, `lentera`, `bendera`, `tong`, `peti`, dll. `AREA` + `RADIUS` = pusat dan jari-jari tiap area. Pembangun area per peran. `bebas()` menjauhkan rumput, pohon, dan batu dari area dan jalan. |
-| STASIUN KERJA | `buatStasiun(props, pembangunProp)`: agen berdiri di **samping** properti (`kananLayar`), bukan di belakang. `STASIUN[peran]` + `STASIUN.Lead_<Area>`, `areaLead()`, `ambilSlot` / `lepasSlot` |
-| QUEST QA | `QUEST` (state), `bangunQuest` (papan per grup + kertas `InstancedMesh` + slime FAIL), `soroti`, `ambilQuest` (tiap 30 detik), `gambarQuest` (tab panel kiri), `pilihTC` (detail TC) |
-| KARAKTER CHIBI | `buatKarakter(peran, id)`: kerangka `pinggul` → `leher` / `bahuK` / `bahuKi` / `pahaK` / `pahaKi`, alat di tangan kanan (`s.al`), kostum per peran, warna kulit dan rambut dari `hashTeks(id)` |
+| KONFIG | `SIMPAN_MENIT` (agen selesai duduk di kedai), `POLL_MS`, `LAJU`, `SKALA_ORANG`, `WARNA` per peran, `LEAD_TAHAN`, `AKTIVITAS` (teks gelembung), `IKON` + `pil()` (ikon SVG per peran) |
+| RENDERER, SCENE, KAMERA | renderer ACES + sRGB + PCFSoft, `hemi`, `matahari` (+ `ARAH_MATAHARI`), kamera ortografis miring (`kam.az` / `el` / `zoom`, `VIEW`, jarak 260, near 1), `aturKamera`, `aturBayangan` (frustum bayangan ketat mengikuti kamera, di-snap ke grid texel) |
+| POST-PROCESSING | `FX` = EffectComposer: RenderPass (MSAA 4x) → GTAO (Ultra saja) → UnrealBloom (setengah resolusi) → tilt-shift H/V → OutputPass (tone mapping) → `GRADE` (tint, saturasi, kontras, vinyet). `ukuran()` mengatur ukuran semuanya. |
+| TEKSTUR PROSEDURAL | `derau()` (value noise tileable), `TEX.*`: rumput, tanah, batu, pasir, kayu, butir, awan, perkamen, blob. `WAKTU` = uniform waktu bersama. |
+| MATERIAL & HELPER | `mat()` (cache, semua diberi peta `TEX.butir`), `kotak`, `silinder`, `labelDunia`, `pasangAngin()` (shader angin utk pohon, rumput, bunga) |
+| DUNIA | `HIDUP[]` = animasi dunia `f(t, dt)` per frame. `SUASANA` (lampu, malam, jam). Tanah: `tinggi(x,z)`, `sungaiZ`, `KOLAM`, mask canvas `kMask` (R = jalan, G = tepi air) yang dibaca shader tanah dan `bacaMask()`. Helper: `alas` (bertekstur), `jalan` (kurva S dilukis ke mask), `api`, `asapDari`, `baraLayang`, `lentera`, `bendera` / `benderaDi`, `umbul`, `tong`, `peti`, `pagar`, dll. `PARTIKEL[]` + `grupPartikel()`. `AREA` + `RADIUS` = pusat dan jari-jari tiap area. Pembangun area per peran, Aula Guild, sungai/kolam/jembatan/ladang. `bangunTanah()`, `bebas()`, `bangunPohon()` (InstancedMesh), rumput & bunga instanced. |
+| ATMOSFER | `KUNCI_JAM` (warna dan kekuatan cahaya per jam), `atmosfer(dt)`, `LAMPU_MALAM` (5 PointLight tetap), kunang-kunang, daun gugur, burung, `SUARA` (WebAudio prosedural) |
+| STASIUN KERJA | `buatStasiun(props, pembangunProp)`: agen berdiri di **samping** properti (`kananLayar`), bukan di belakang. Properti yang dibuat pembangun ditandai `userData.dinamis`. `STASIUN[peran]` + `STASIUN.Lead_<Area>`, `areaLead()`, `ambilSlot` / `lepasSlot` |
+| QUEST QA | `QUEST` (state), `bangunQuest` (papan berbingkai per grup + kertas perkamen `InstancedMesh` + slime FAIL), `soroti`, `ambilQuest` (tiap 30 detik), `gambarQuest` (tab panel kiri), `pilihTC` (detail TC) |
+| KARAKTER CHIBI | `matK()` (shading halus + rim light), `gabungAnak()` (gabung mesh per tulang), `buatKarakter(peran, id)`: kerangka `pinggul` → `leher` / `bahuK` / `bahuKi` / `pahaK` / `pahaKi`, `mata` (kedip), `bayang` (bayangan kontak), alat di tangan kanan (`s.al`), kostum per peran, warna kulit dan rambut dari `hashTeks(id)` |
 | AGEN DI DUNIA | `animDari` (tool ke animasi), `buatAgenDunia`, `tempatkan` (tujuan menurut status, alur lapor → kedai → pulang), `sinkron` (data ke dunia; jeda pindah area untuk Lead), `tulisLabel` |
-| ANIMASI | `pose(o, dt)` dengan `switch` per animasi (`tempa`, `panas`, `celup`, `baca`, `uji`, `teropong`, `tulis`, `tidur`, `santai`, `lapor`, `perintah`, `jalan`), `animLead`, `langkah` |
+| ANIMASI | `pose(o, dt)` dengan `switch` per animasi (`tempa`, `panas`, `celup`, `baca`, `uji`, `teropong`, `tulis`, `tidur`, `santai`, `lapor`, `perintah`, `jalan`), napas, kedip, `animLead`, `langkah` |
 | DATA | `buatDemo` / `majuDemo` (tombol Demo), `semuaAgen`, `ambil` (polling `/api/agen?ringkas=1`) |
 | UI | `gambarDaftar`, `detailDari` (ambil detail per agen), `gambarDetail` / `gambarDetailLead`, `pilih` |
 | KONTROL KAMERA | drag, scroll, WASD, Q/E, `pick()` (agen, slime, kertas TC lewat `instanceId`, papan) |
-| LOOP | mode hemat (`hemat`, `FPS_HEMAT`, `terapkanHemat`, saran saat fps di bawah 40), lalu kamera, agen, partikel, `HIDUP`, render |
+| STATIC BATCHING | `gabungStatis()`: mesh dunia yang tidak digerakkan `HIDUP` digabung per material (sekali, sebelum data pertama) |
+| KUALITAS GRAFIS / LOOP | `kualitas` (`hemat` / `normal` / `ultra`), `terapkanKualitas`, saran hemat saat fps di bawah 40, lalu loop: kamera, bayangan, agen, partikel, `atmosfer`, `HIDUP`, render (composer atau langsung), peta mini |
+| TOOLTIP / PETA MINI | tooltip hover (`pick` tiap 70 ms), `PETA` (dasar dari mask, diputar sesuai `kam.az`, klik = terbang), fps, tombol M; parser hash `#kam=` / `waktu=` |
+
+#### Arsitektur render desa
+
+- **Jalur render.** Mode Normal dan Ultra memakai `FX.c.render()` (composer). Mode Hemat memanggil `renderer.render()` langsung, jadi tanpa bloom, tilt-shift, dan grading; tone mapping ACES tetap jalan karena dikerjakan renderer.
+- **Cahaya.** Satu `DirectionalLight` (matahari siang, bulan malam) yang menghasilkan bayangan, satu `HemisphereLight`, dan PointLight dalam jumlah **tetap**: api tungku, api kedai, bola sihir, plus 5 `LAMPU_MALAM`. Yang berubah hanya intensitasnya.
+- **Emisif + bloom.** Api, lentera, jendela, kunang-kunang, dan bara memakai `emissiveIntensity` di atas 1, sehingga melewati ambang bloom (1.05, linear HDR). Benda biasa di bawah ambang, jadi tidak ikut bersinar.
+- **Draw call.** Dunia statis digabung oleh `gabungStatis()`. Pohon, rumput, bunga, daun, dan kertas Quest memakai `InstancedMesh`, dan karakter digabung per tulang oleh `gabungAnak()`. Hasil ukur ada di bagian 7.
+- **Shader kustom** lewat `onBeforeCompile`: tanah (splat rumput/tanah dari mask, bayangan awan), air (normal bergelombang, garis arus), angin (`pasangAngin`), rim light karakter (`matK`). Semuanya memakai uniform `WAKTU`.
+
+#### Setelan kualitas (tombol "Grafis", disimpan di `localStorage.desaKualitas`)
+
+| | Hemat | Normal (bawaan) | Ultra |
+|---|---|---|---|
+| Batas fps | 30 | tanpa batas | tanpa batas |
+| Resolusi | 1x | maks 1.5x | maks 2x |
+| Bayangan matahari | mati | 2048 | 4096 |
+| Bloom, tilt-shift, grading | mati | nyala | nyala |
+| Ambient occlusion (GTAO) | mati | mati | nyala |
+| Rumput, partikel (asap, bara, kunang-kunang, daun, burung, kertas melayang, rune) | mati | nyala | nyala |
+| Bayangan kontak karakter | nyala | nyala | nyala |
+
+`localStorage.desaHemat` lama tetap dibaca (nilai `1` berarti Hemat) dan ikut ditulis supaya kompatibel. Siklus tombolnya: Normal → Ultra → Hemat → Normal.
 
 `index.html` adalah dashboard tabel biasa. Ia memakai `/api/agen` lengkap, dan riwayat tugas Lead ditampilkan di `<details>`.
 
@@ -181,7 +208,15 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
   - `desa.html`: `WARNA`, area di `AREA` / `RADIUS` (sebelum alam disebar), pembangun area + `PROP_*`, `STASIUN.<Peran>`, kostum di `buatKarakter`, animasi di `animDari`, kelas `.p-<Peran>` di CSS.
   - `index.html`: `PERAN` dan `.p-<Peran>`.
 - **Animasi baru:** pemetaan tool ke nama di `animDari` (dan `animLead` untuk Lead), pose di `switch` dalam `pose()`, teks di `AKTIVITAS`. Pose direset tiap frame di awal `pose()`.
-- **Dekorasi atau gimmick dunia:** bangun dengan helper yang ada, lalu daftarkan animasinya ke `HIDUP`. Jaga jumlah `PointLight`; dekorasi kecil cukup memakai `emisif()`.
+- **Dekorasi atau gimmick dunia:** bangun dengan helper yang ada, lalu daftarkan animasinya ke `HIDUP`. Jaga jumlah `PointLight`; dekorasi kecil cukup memakai `emisif()` (bloom membuatnya tampak bersinar).
+- **Area atau set props baru:**
+  1. Tambahkan pusat dan jari-jari di `AREA` / `RADIUS`, sebelum alam disebar, supaya `bebas()` menjauhkan pohon, rumput, dan batu.
+  2. Bangun lantainya dengan `alas(cx, cz, r, warna, seg, y, off, TEX.batu | TEX.pasir | TEX.kayu | TEX.tanah)`. Tekstur dikalikan dengan warna, jadi pilih warna terang.
+  3. Hubungkan dengan `jalan(x1, z1, x2, z2, lebar)`. Semua `jalan()` harus dipanggil **sebelum** `bangunTanah()`.
+  4. Props statis cukup dibuat dengan `kotak` / `silinder` / `bola`; `gabungStatis()` menggabungkannya otomatis. Benda yang **digerakkan di luar `HIDUP`** wajib diberi `userData.dinamis = true` (lihat jebakan 11).
+  5. Beri label lantai dengan `labelDunia(nama, x, 0.3, z)` dan warna di `warnaArea` dalam `bangunPetaDasar()` (peta mini).
+- **Partikel baru:** buat grup dengan `grupPartikel()`, lalu di fungsi `HIDUP`-nya tulis `if (!G.visible) return;` di awal. Mode Hemat menyembunyikan grup itu dan update-nya ikut berhenti.
+- **Suasana jam baru:** ubah atau tambah baris di `KUNCI_JAM` (jam 0–24, urut, baris terakhir = salinan jam 0). Benda yang perlu menyala malam membaca `SUASANA.lampu` / `SUASANA.malam`.
 - **Format QA baru:** ubah `baca_qa` saja. UI hanya bergantung pada bentuk JSON `api_qa` / `api_qa_tc`.
 - **Semua teks UI berbahasa Indonesia**, singkat, tanpa emoji.
 
@@ -199,6 +234,12 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 8. **Putaran QA parsial:** status sebuah TC jangan hanya diambil dari putaran terakhir. Pakai `kini`.
 9. **Rak buku dan wadah sejenis:** jangan dibuat dari kotak padat, karena isinya ikut tertelan. Buat terbuka: panel belakang, sisi, dan atap.
 10. **Data pribadi:** jangan commit `qa.json`, transkrip, atau path pribadi. Repo ini **publik**.
+11. **Static batching membekukan mesh.** `gabungStatis()` menganggap mesh diam kalau transform dan geometrinya tidak berubah saat semua `HIDUP` dijalankan beberapa kali. Benda yang digerakkan dari tempat lain (misalnya boneka latihan yang digoyang `pose()`) **harus** diberi `userData.dinamis = true`. Kalau tidak, ia ikut digabung dan berhenti bergerak. `buatStasiun()` sudah menandai properti hasil pembangunnya.
+12. **GTAOPass 0.160** salah menulis define kameranya (typo `definesPERSPECTIVE_CAMERA`). Define `PERSPECTIVE_CAMERA = 0` diset manual untuk kamera ortografis. Jangan dihapus, dan near kamera harus tetap lebih dari 0.
+13. **Jumlah lampu harus tetap.** Menambah atau menghapus `PointLight` saat jalan memicu kompilasi ulang semua shader, dan layar tersendat. Atur `intensity`-nya saja (contoh: `LAMPU_MALAM`).
+14. **Mask tanah dibangun sekali.** `jalan()` atau lukisan air setelah `bangunTanah()` tidak akan tampil, dan `bacaMask()` menyimpan piksel pada panggilan pertama.
+15. **Wajah karakter:** mata, alis, dan mulut harus sedikit di **luar** permukaan bola kepala (radius 0.37). Kalau tidak, mereka tenggelam dan wajah tampak polos. `SphereGeometry` parsial untuk rambut belakang memakai `phiStart = π`, `phiLength = π` (setengah belakang); rentang penuh akan menutupi wajah.
+16. **Hemat melewati composer.** Efek yang hanya ada di `GRADE` / bloom (tint siang-malam, vinyet) tidak muncul di mode Hemat. Warna dasar siang-malam tetap jalan karena diatur lewat cahaya dan kabut.
 
 ---
 
@@ -221,8 +262,17 @@ s.shutdown()
 EOF
 ```
 
-3. **Uji di browser:** buka `/desa`, tekan **Demo** (6 agen tiruan, satu di antaranya selesai sekitar 25 detik kemudian), klik agen di daftar dan di peta, buka tab **Quest QA**, klik kertas dan slime, lalu coba **Hemat**. Console harus bersih.
-4. **Uji performa:** di 1920x1080 dengan semua area terlihat, target normal sekitar 50–60 fps, dan mode hemat tetap lancar. Server sekitar 33 MB RAM dan ~3% satu inti CPU.
+3. **Uji di browser:** buka `/desa`, tekan **Demo** (6 agen tiruan, satu di antaranya selesai sekitar 25 detik kemudian), klik agen di daftar dan di peta, buka tab **Quest QA**, klik kertas dan slime, arahkan kursor ke agen (tooltip), klik peta mini, lalu putar tombol **Grafis** (Normal → Ultra → Hemat) dan **Waktu**. Console harus bersih.
+   - Hash URL mempercepat uji visual: `/desa#kam=-34,8,1.6` (pusat kamera x, z, zoom, opsional jumlah putaran 90°) dan `&waktu=malam` (`pagi` / `siang` / `senja` / `malam` / `otomatis`).
+   - Chromium headless di container cloud memakai GPU software (SwiftShader). Fps di sana tidak mewakili GPU sungguhan (1080p dengan composer kurang dari 3 fps), jadi pakai untuk screenshot dan cek error saja. Kalau screenshot Ultra timeout, naikkan timeout atau pakai viewport lebih kecil.
+4. **Uji performa (di mesin asli):** angka fps tampil di pojok kanan bawah peta mini. Target Normal di 1920x1080 sekitar 50 fps atau lebih di PC menengah, dan mode Hemat tetap lancar. Hitung draw call per frame dengan hook `WebGL2RenderingContext.prototype.drawElements` dan sejenisnya. Hasil ukur di container, dengan scene uji yang sama (5 agen asli + Lead + katalog QA 3 grup) dan sebelum Demo:
+
+   | Versi | Normal | Hemat |
+   |---|---|---|
+   | sebelum upgrade (`383a278`) | ~1470 draw call/frame | ~140 |
+   | sesudah | (sedang diukur) | (sedang diukur) |
+
+   Server sendiri ringan: sekitar 33 MB RAM dan ~3% dari satu inti CPU.
 
 ---
 
