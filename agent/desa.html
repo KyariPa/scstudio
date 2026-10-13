@@ -1212,7 +1212,28 @@ const KULIT = [0xf2d3b3, 0xe8b98f, 0xd9a273, 0xb87a4e, 0x8d5a3b, 0xf6e0c8];
 const RAMBUT = [0x2b1d14, 0x5a3720, 0x8a5a2b, 0xc9a25a, 0x1e1e24, 0x9a3b2a, 0xd9d0c0, 0x3b3f6b];
 const LOGAM = 0xb9c0ca;
 function hashTeks(s){ let h = 2166136261; for (let i=0;i<s.length;i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; }
-function bagian(geo, c, parent, x=0, y=0, z=0){ const m = new THREE.Mesh(geo, mat(c)); m.position.set(x,y,z); m.castShadow = true; parent.add(m); return m; }
+// material karakter: shading halus (bukan flat) + rim light hangat di tepi siluet -> karakter "terangkat" dari latar
+const matKC = {};
+function matK(c, logam = false){ const k = c + (logam ? 'L' : ''); return matKC[k] ??= (() => {
+  const m = new THREE.MeshStandardMaterial({color:c, roughness: logam ? 0.32 : 0.66, metalness: logam ? 0.65 : 0});
+  m.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+    { vec3 vd = isOrthographic ? vec3(0.0, 0.0, 1.0) : normalize(vViewPosition);
+      float rim = pow(1.0 - clamp(dot(normal, vd), 0.0, 1.0), 2.6);
+      totalEmissiveRadiance += diffuseColor.rgb * rim * 0.5 + vec3(1.0, 0.9, 0.75) * rim * 0.1; }`); };
+  m.customProgramCacheKey = () => 'karakterRim'; return m; })(); }
+function bagian(geo, c, parent, x=0, y=0, z=0, logam=false){ const m = new THREE.Mesh(geo, matK(c, logam)); m.position.set(x,y,z); m.castShadow = true; parent.add(m); return m; }
+// gabung mesh anak langsung per material dalam satu tulang (pinggul/leher/lengan/kaki) -> draw call per karakter turun drastis
+function gabungAnak(grp){
+  const peta = new Map();
+  for (const m of [...grp.children]) if (m.isMesh && !m.userData.jaga){ const k = m.material.uuid; if (!peta.has(k)) peta.set(k, []); peta.get(k).push(m); }
+  for (const ms of peta.values()){ if (ms.length < 2) continue;
+    const gs = ms.map(m => { m.updateMatrix(); const g = m.geometry.index ? m.geometry.toNonIndexed() : m.geometry.clone();
+      for (const k of Object.keys(g.attributes)) if (!['position','normal','uv'].includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count*2), 2));
+      return g.applyMatrix4(m.matrix); });
+    const gab = mergeGeometries(gs); if (!gab) continue;
+    const M = new THREE.Mesh(gab, ms[0].material); M.castShadow = true; grp.add(M); for (const m of ms){ grp.remove(m); m.geometry.dispose(); } }
+}
 const gelapkan = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();
 function alat(jenis){
   const g = new THREE.Group();
@@ -1233,40 +1254,50 @@ function buatKarakter(peran, id){
   const g = new THREE.Group();
   const pinggul = new THREE.Group(); pinggul.position.y = 0.95; g.add(pinggul);
   // badan: tunik + rok tunik + sabuk bergesper
-  const badan = bagian(new THREE.CylinderGeometry(0.26, 0.32, 0.72, 8), warna, pinggul, 0, 0.42, 0);
-  bagian(new THREE.CylinderGeometry(0.33, 0.39, 0.24, 8), baju2, pinggul, 0, 0.02, 0);
-  bagian(new THREE.CylinderGeometry(0.33, 0.33, 0.08, 8), 0x5a3b22, pinggul, 0, 0.16, 0);
+  const badan = bagian(new THREE.CylinderGeometry(0.26, 0.32, 0.72, 14), warna, pinggul, 0, 0.42, 0);
+  bagian(new THREE.CylinderGeometry(0.33, 0.39, 0.24, 14), baju2, pinggul, 0, 0.02, 0);
+  bagian(new THREE.CylinderGeometry(0.335, 0.335, 0.08, 14), 0x5a3b22, pinggul, 0, 0.16, 0);
+  bagian(new THREE.SphereGeometry(0.27, 14, 8, 0, Math.PI*2, 0, Math.PI/2), warna, pinggul, 0, 0.78, 0);   // bahu bundar
   bagian(new THREE.BoxGeometry(0.11, 0.09, 0.05), 0xd9b44a, pinggul, 0, 0.16, 0.32);
   // kepala besar (chibi): wajah, mata berkilau, hidung, pipi, rambut
   const leher = new THREE.Group(); leher.position.y = 0.78; pinggul.add(leher);
-  bagian(new THREE.CylinderGeometry(0.09, 0.1, 0.12, 6), kulit, leher, 0, 0.02, 0);
-  bagian(new THREE.IcosahedronGeometry(0.37, 1), kulit, leher, 0, 0.36, 0);
+  bagian(new THREE.CylinderGeometry(0.09, 0.1, 0.12, 10), kulit, leher, 0, 0.02, 0);
+  bagian(new THREE.SphereGeometry(0.37, 22, 16), kulit, leher, 0, 0.36, 0);
+  for (const sx of [-1, 1]) bagian(new THREE.SphereGeometry(0.07, 10, 8), kulit, leher, sx*0.36, 0.34, 0).scale.set(0.6, 1, 0.8);   // telinga
+  const mata = [];   // mata besar ala chibi: iris gelap + kilau; dipisah (jaga) supaya bisa berkedip
   for (const sx of [-1, 1]){
-    bagian(new THREE.SphereGeometry(0.055, 6, 5), 0x1d1b1a, leher, sx*0.13, 0.37, 0.32);
-    bagian(new THREE.SphereGeometry(0.02, 4, 3), 0xffffff, leher, sx*0.13+0.02, 0.4, 0.37);
-    bagian(new THREE.SphereGeometry(0.05, 6, 4), 0xf09a8a, leher, sx*0.21, 0.27, 0.29).scale.set(1, 0.5, 0.4);
+    const e = new THREE.Group(); e.position.set(sx*0.13, 0.37, 0.338); leher.add(e); mata.push(e);
+    const ir = bagian(new THREE.SphereGeometry(0.068, 12, 10), 0x2a1c14, e, 0, 0, 0); ir.scale.set(0.85, 1.15, 0.6);
+    bagian(new THREE.SphereGeometry(0.024, 8, 6), 0xffffff, e, sx*0.012+0.018, 0.03, 0.035);
+    bagian(new THREE.SphereGeometry(0.012, 6, 4), 0xffffff, e, -0.02, -0.03, 0.035);
+    bagian(new THREE.BoxGeometry(0.11, 0.024, 0.04), gelapkan(rambut, 0.9), leher, sx*0.13, 0.475, 0.335).rotation.z = -sx*0.12;   // alis
+    bagian(new THREE.SphereGeometry(0.05, 8, 6), 0xf09a8a, leher, sx*0.2, 0.28, 0.298).scale.set(1, 0.5, 0.4);
   }
-  bagian(new THREE.SphereGeometry(0.035, 5, 4), gelapkan(kulit, 0.88), leher, 0, 0.3, 0.36);
+  bagian(new THREE.SphereGeometry(0.03, 8, 6), gelapkan(kulit, 0.86), leher, 0, 0.3, 0.365);
+  bagian(new THREE.BoxGeometry(0.1, 0.024, 0.04), 0x7a3a30, leher, 0, 0.225, 0.348);   // mulut
   const helm = peran === 'Tester';
   if (!helm){
-    const rb = bagian(new THREE.SphereGeometry(0.395, 12, 8, 0, Math.PI*2, 0, Math.PI*0.5), rambut, leher, 0, 0.38, -0.03);
+    const rb = bagian(new THREE.SphereGeometry(0.395, 20, 10, 0, Math.PI*2, 0, Math.PI*0.5), rambut, leher, 0, 0.38, -0.03);
+    bagian(new THREE.SphereGeometry(0.385, 16, 10, Math.PI, Math.PI, Math.PI*0.4, Math.PI*0.32), rambut, leher, 0, 0.36, -0.03);   // rambut belakang (setengah lingkar BELAKANG saja)
     rb.rotation.x = -0.32;   // condong ke belakang -> dahi & wajah terbuka
     bagian(new THREE.BoxGeometry(0.5, 0.1, 0.12), rambut, leher, 0, 0.62, 0.22).rotation.x = 0.5; // poni
   }
   // lengan: bahu bulat, lengan baju, lengan bawah, tangan
   const bahu = [0.33, -0.33].map(x => {
     const b = new THREE.Group(); b.position.set(x, 0.68, 0); pinggul.add(b);
-    bagian(new THREE.SphereGeometry(0.13, 8, 6), warna, b);
-    bagian(new THREE.CylinderGeometry(0.105, 0.09, 0.4, 7), warna, b, 0, -0.2, 0);
-    bagian(new THREE.CylinderGeometry(0.075, 0.07, 0.28, 7), kulit, b, 0, -0.52, 0);
-    bagian(new THREE.IcosahedronGeometry(0.095, 0), kulit, b, 0, -0.7, 0);
+    bagian(new THREE.SphereGeometry(0.13, 12, 10), warna, b);
+    bagian(new THREE.CylinderGeometry(0.105, 0.09, 0.4, 12), warna, b, 0, -0.2, 0);
+    bagian(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 12), baju2, b, 0, -0.39, 0);   // manset
+    bagian(new THREE.CylinderGeometry(0.075, 0.07, 0.28, 10), kulit, b, 0, -0.52, 0);
+    bagian(new THREE.SphereGeometry(0.095, 12, 10), kulit, b, 0, -0.7, 0);
     const t = new THREE.Group(); t.position.y = -0.72; b.add(t); return {b, t};
   });
   // kaki: celana + sepatu bot
   const paha = [0.14, -0.14].map(x => {
     const p = new THREE.Group(); p.position.set(x, 0, 0); pinggul.add(p);
-    bagian(new THREE.CylinderGeometry(0.115, 0.095, 0.72, 7), celana, p, 0, -0.38, 0);
-    bagian(new THREE.BoxGeometry(0.21, 0.2, 0.34), sepatu, p, 0, -0.84, 0.05);
+    bagian(new THREE.CylinderGeometry(0.115, 0.095, 0.72, 12), celana, p, 0, -0.38, 0);
+    bagian(new THREE.CylinderGeometry(0.115, 0.12, 0.2, 12), sepatu, p, 0, -0.74, 0);   // bot
+    const kk = bagian(new THREE.SphereGeometry(0.13, 12, 8), sepatu, p, 0, -0.86, 0.06); kk.scale.set(0.85, 0.6, 1.35);
     return p;
   });
   // ── kostum per peran ──
@@ -1282,11 +1313,11 @@ function buatKarakter(peran, id){
     bagian(new THREE.CylinderGeometry(0.335, 0.335, 0.07, 12), 0xd9b44a, leher, 0, 0.7, 0);
     for (const sx of [-1,1]){ const k = bagian(new THREE.TorusGeometry(0.075, 0.016, 5, 12), 0x2b2620, leher, sx*0.13, 0.37, 0.36); }
   } else if (peran === 'Tester'){ // ksatria: helm + bulu, pelindung bahu, pelat dada, perisai di punggung
-    bagian(new THREE.SphereGeometry(0.41, 12, 8, 0, Math.PI*2, 0, Math.PI*0.56), LOGAM, leher, 0, 0.37, -0.01).rotation.x = -0.12;
+    bagian(new THREE.SphereGeometry(0.41, 20, 12, 0, Math.PI*2, 0, Math.PI*0.56), LOGAM, leher, 0, 0.37, -0.01, true).rotation.x = -0.12;
     bagian(new THREE.BoxGeometry(0.08, 0.3, 0.06), LOGAM, leher, 0, 0.5, 0.4).rotation.x = 0.3; // pelindung hidung
     bagian(new THREE.ConeGeometry(0.1, 0.42, 6), 0xc0392b, leher, 0, 0.88, -0.1).rotation.x = -0.5; // bulu helm
-    bagian(new THREE.CylinderGeometry(0.29, 0.31, 0.42, 8), LOGAM, pinggul, 0, 0.56, 0);
-    for (const b of bahu) bagian(new THREE.SphereGeometry(0.17, 8, 5, 0, Math.PI*2, 0, Math.PI/2), LOGAM, b.b, 0, 0.04, 0);
+    bagian(new THREE.CylinderGeometry(0.29, 0.31, 0.42, 14), LOGAM, pinggul, 0, 0.56, 0, true);
+    for (const b of bahu) bagian(new THREE.SphereGeometry(0.17, 12, 6, 0, Math.PI*2, 0, Math.PI/2), LOGAM, b.b, 0, 0.04, 0, true);
     const pr = bagian(new THREE.CylinderGeometry(0.4, 0.4, 0.07, 12), warna, pinggul, 0, 0.42, -0.38); pr.rotation.x = Math.PI/2;
     const tp = bagian(new THREE.TorusGeometry(0.4, 0.04, 5, 16), LOGAM, pinggul, 0, 0.42, -0.42);
     bagian(new THREE.BoxGeometry(0.1, 0.1, 0.05), 0xd9b44a, pinggul, 0, 0.42, -0.44);
@@ -1302,8 +1333,8 @@ function buatKarakter(peran, id){
     bagian(new THREE.BoxGeometry(0.8, 0.08, 0.08), 0xd9b44a, pinggul, 0, 0.8, -0.3);
     for (const b of bahu) bagian(new THREE.SphereGeometry(0.16, 8, 5, 0, Math.PI*2, 0, Math.PI/2), 0xd9b44a, b.b, 0, 0.05, 0);
     const pita = bagian(new THREE.BoxGeometry(0.09, 0.85, 0.04), 0xd9b44a, pinggul, 0.02, 0.42, 0.31); pita.rotation.z = 0.6;
-    bagian(new THREE.CylinderGeometry(0.29, 0.31, 0.16, 10), 0xd9b44a, leher, 0, 0.74, -0.02);
-    for (let i=0;i<5;i++){ const a = i/5*Math.PI*2; const dur = bagian(new THREE.ConeGeometry(0.06, 0.18, 4), 0xd9b44a, leher, Math.sin(a)*0.27, 0.9, Math.cos(a)*0.27-0.02); }
+    bagian(new THREE.CylinderGeometry(0.29, 0.31, 0.16, 16), 0xd9b44a, leher, 0, 0.74, -0.02, true);
+    for (let i=0;i<5;i++){ const a = i/5*Math.PI*2; bagian(new THREE.ConeGeometry(0.06, 0.18, 4), 0xd9b44a, leher, Math.sin(a)*0.27, 0.9, Math.cos(a)*0.27-0.02, true); }
     bagian(new THREE.OctahedronGeometry(0.06, 0), 0xc0392b, leher, 0, 0.76, 0.3);
   } else { // penduduk: tudung
     bagian(new THREE.SphereGeometry(0.42, 10, 8, 0, Math.PI*2, 0, Math.PI*0.5), baju2, leher, 0, 0.36, -0.06).rotation.x = -0.45;
@@ -1315,7 +1346,10 @@ function buatKarakter(peran, id){
   const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.7,0.7,2.6,8), new THREE.MeshBasicMaterial({visible:false})); hit.position.y=1.3; g.add(hit);
   const cincin = new THREE.Mesh(new THREE.RingGeometry(0.75,0.95,24), new THREE.MeshBasicMaterial({color:0xe8b85a, transparent:true, opacity:.9, side:THREE.DoubleSide}));
   cincin.rotation.x=-Math.PI/2; cincin.position.y=0.05; cincin.visible=false; g.add(cincin);
-  return {g, pinggul, badan, leher, bahuK:bahu[0].b, bahuKi:bahu[1].b, pahaK:paha[0], pahaKi:paha[1], al, buku, hit, cincin};
+  for (const grp of [pinggul, leher, bahu[0].b, bahu[1].b, paha[0], paha[1]]) gabungAnak(grp);
+  const bayang = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.5), new THREE.MeshBasicMaterial({map:TEX.blob, transparent:true, depthWrite:false, opacity:0.75}));
+  bayang.rotation.x = -Math.PI/2; bayang.position.y = 0.045; bayang.renderOrder = 1; g.add(bayang);   // bayangan kontak (tetap ada di mode hemat)
+  return {g, pinggul, badan, leher, bahuK:bahu[0].b, bahuKi:bahu[1].b, pahaK:paha[0], pahaKi:paha[1], al, buku, hit, cincin, mata, bayang};
 }
 
 // ═════ PARTIKEL (percikan, asap, zzz) ═════
@@ -1461,7 +1495,8 @@ function pose(o, dt){
   const s = o.s, a = o.data; o.t += dt;
   const t = o.t;
   // reset pose
-  s.pinggul.position.y = 0.95; s.pinggul.rotation.set(0,0,0); s.leher.rotation.set(0,0,0);
+  s.pinggul.position.y = 0.95; s.pinggul.rotation.set(0,0,0); s.leher.rotation.set(0,0,0); s.leher.position.y = 0.78 + Math.sin(t*2.1)*0.012;   // napas
+  s.bayang.scale.set(1, 1, 1);
   for (const b of [s.bahuK, s.bahuKi]) b.rotation.set(0,0,0);
   s.pahaK.rotation.set(0,0,0); s.pahaKi.rotation.set(0,0,0);
   for (const k in s.al) s.al[k].visible = false; s.buku.visible = false;
@@ -1473,7 +1508,10 @@ function pose(o, dt){
   if (anim !== o.animTampil){ o.animTampil = anim; tulisLabel(o); }
   const slot = o.slot;
   switch (anim){
-    case 'jalan': { const f = Math.sin(t*9); s.pahaK.rotation.x = f*0.6; s.pahaKi.rotation.x = -f*0.6; s.bahuK.rotation.x = -f*0.5; s.bahuKi.rotation.x = f*0.5; s.pinggul.position.y = 0.95+Math.abs(Math.cos(t*9))*0.06; break; }
+    case 'jalan': { const f = Math.sin(t*9), b = Math.abs(Math.cos(t*9));
+      s.pahaK.rotation.x = f*0.65; s.pahaKi.rotation.x = -f*0.65; s.bahuK.rotation.x = -f*0.6; s.bahuKi.rotation.x = f*0.6; s.bahuK.rotation.z = 0.08; s.bahuKi.rotation.z = -0.08;
+      s.pinggul.position.y = 0.95 + b*0.07; s.pinggul.rotation.x = 0.07; s.pinggul.rotation.y = f*0.08; s.pinggul.rotation.z = f*0.03;
+      s.leher.rotation.x = -0.05 + b*0.04; s.leher.rotation.y = -f*0.06; s.bayang.scale.setScalar(1 - b*0.12); break; }
     case 'tempa': { // angkat palu pelan, hantam cepat
       s.al.palu.visible = true; const p = (t % 0.95)/0.95;
       const ang = p < 0.65 ? -0.6 - (p/0.65)*2.3 : -2.9 + ((p-0.65)/0.35)*2.3;
@@ -1491,7 +1529,7 @@ function pose(o, dt){
       break; }
     case 'teropong': { s.al.teropong.visible = true; s.bahuK.rotation.x = -2.5; s.bahuK.rotation.z = -0.45; s.bahuKi.rotation.x = -0.3; s.leher.rotation.x = -0.25; s.pinggul.rotation.y = Math.sin(t*0.6)*0.5; break; }
     case 'tulis': { s.al.pena.visible = true; s.bahuK.rotation.x = -0.95+Math.sin(t*7)*0.08; s.bahuK.rotation.z = Math.sin(t*3.5)*0.15; s.bahuKi.rotation.x = -0.8; s.leher.rotation.x = 0.45; s.pinggul.rotation.x = 0.15; break; }
-    case 'tidur': { // berbaring telentang di samping stasiun, napas pelan
+    case 'tidur': { s.bayang.scale.set(1.9, 1.2, 1); // berbaring telentang di samping stasiun, napas pelan
       // berbaring MIRING ke sumbu x lokal (tegak lurus arah pandang kamera) - kalau searah pandang, dari atas tampak berdiri
       s.pinggul.position.y = 0.3; s.pinggul.rotation.z = Math.PI/2 + Math.sin(t*1.2)*0.02; s.leher.rotation.z = -0.25;
       s.bahuK.rotation.x = -0.6; s.bahuKi.rotation.x = -0.9; s.pahaK.rotation.x = -0.5; s.pahaKi.rotation.x = -0.2; break; }
@@ -1501,8 +1539,13 @@ function pose(o, dt){
       const p = (t % 3)/3; s.bahuK.rotation.x = -2.0 + Math.sin(t*2)*0.15; s.bahuK.rotation.z = -0.2;
       s.bahuKi.rotation.x = -0.35; s.bahuKi.rotation.z = 0.55; s.leher.rotation.x = -0.12; s.al.gulung.visible = p > 0.5; break; }
     case 'lapor': { s.al.gulung.visible = true; s.bahuK.rotation.x = -1.7+Math.sin(t*3)*0.1; s.leher.rotation.x = -0.15; break; }
-    default: { s.bahuK.rotation.x = Math.sin(t*1.5)*0.05; s.bahuKi.rotation.x = -Math.sin(t*1.5)*0.05; }
+    default: { s.bahuK.rotation.x = Math.sin(t*1.5)*0.05; s.bahuKi.rotation.x = -Math.sin(t*1.5)*0.05; s.bahuK.rotation.z = 0.06; s.bahuKi.rotation.z = -0.06;
+      s.leher.rotation.y = Math.sin(t*0.45 + o.t*0.1)*0.35; s.leher.rotation.x = Math.sin(t*0.3)*0.05; }
   }
+  // kedip: tiap 2.5-6 dtk mata menutup sebentar (tidur = mata tertutup)
+  if (o.kedipT === undefined) o.kedipT = 1 + Math.random()*4;
+  o.kedipT -= dt; if (o.kedipT < -0.13) o.kedipT = 2.5 + Math.random()*3.5;
+  const tutup = anim === 'tidur' || o.kedipT < 0; for (const m of s.mata) m.scale.y = tutup ? 0.12 : 1;
 }
 
 function animLead(o, a){
