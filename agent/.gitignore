@@ -4,3 +4,5 @@ __pycache__/
 *.jsonl
 # daftar folder QA lokal (path pribadi)
 qa.json
+# pemetaan nama sesi -> kostum karakter desa (nama sesi pribadi)
+kostum.json

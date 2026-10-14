@@ -425,6 +425,24 @@ RE_ID_TC = re.compile(r'^([A-Z]+)-(\d{3})$')
 _qa = {}  # folder -> {'tanda': (nama,mtime,...), 'data': ...}
 
 
+# Kostum karakter desa: pemetaan nama sesi -> tipe kostum ada di kostum.json LOKAL (nama sesi pribadi, di-gitignore).
+TIPE_KOSTUM = ('komandan', 'pemahat', 'ksatria', 'juru_tulis', 'pencatat', 'penjelajah', 'serba_bisa', 'umum')
+
+
+def api_kostum():
+    try:
+        j = json.load(open(os.path.join(DIR, 'kostum.json'), encoding='utf-8'))
+    except Exception:
+        return {'kostum': []}
+    out = []
+    for x in (j.get('kostum') or []) if isinstance(j, dict) else []:
+        if isinstance(x, dict) and x.get('tipe') in TIPE_KOSTUM and isinstance(x.get('kata'), list):
+            kata = [str(k)[:40] for k in x['kata'] if isinstance(k, str) and k.strip()][:10]
+            if kata:
+                out.append({'kata': kata, 'tipe': x['tipe']})
+    return {'kostum': out[:50]}
+
+
 def daftar_katalog():
     try:
         j = json.load(open(os.path.join(DIR, 'qa.json'), encoding='utf-8'))
@@ -1507,6 +1525,9 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if not self.host_ok():
+            return
+        if self.path.split('?')[0] == '/api/kostum':  # pemetaan nama sesi -> kostum karakter (file lokal)
+            self.kirim(200, 'application/json', json.dumps(api_kostum()))
             return
         if self.path.startswith('/api/pakai'):
             _pakai_jam['diminta'] = time.time()  # desa sedang terbuka -> ping pemakaian boleh jalan

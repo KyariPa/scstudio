@@ -1,0 +1,45 @@
+{
+  "kostum": [
+    {
+      "kata": [
+        "modeling",
+        "3d"
+      ],
+      "tipe": "pemahat"
+    },
+    {
+      "kata": [
+        "game",
+        "gameplay"
+      ],
+      "tipe": "ksatria"
+    },
+    {
+      "kata": [
+        "dokumen",
+        "studio"
+      ],
+      "tipe": "juru_tulis"
+    },
+    {
+      "kata": [
+        "tiket",
+        "backlog"
+      ],
+      "tipe": "pencatat"
+    },
+    {
+      "kata": [
+        "riset",
+        "level"
+      ],
+      "tipe": "penjelajah"
+    },
+    {
+      "kata": [
+        "lain-lain"
+      ],
+      "tipe": "serba_bisa"
+    }
+  ]
+}

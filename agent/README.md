@@ -99,7 +99,7 @@ Tidak ada rumah warga. Tiap peran langsung punya area kerja terbuka yang hidup, 
 
 Animasi dunianya didaftarkan di array `HIDUP` (fungsi `f(t, dt)` yang dipanggil tiap frame). Pohon, rumput, dan bunga memakai `InstancedMesh` dan bergoyang tertiup angin lewat shader. Penempatannya menjauhi area kerja, jalan, dan air (`bebas()`).
 
-**Ketua Guild (Lead)** memakai mahkota emas dan jubah merah. Ia berpindah area mengikuti tool terakhir sesi utama:
+**Sesi utama (Lead)** memakai kostum khas sesuai tipenya: `komandan` (Chat Master: jubah komandan, mahkota, lencana, tombak), `pemahat` (celemek, pahat dan palu kayu), `ksatria` (zirah ringan, pedang), `juru_tulis` (jubah juru tulis, pena), `pencatat` (rompi, kacamata, papan klip), `penjelajah` (topi lebar, peta), `serba_bisa` (topi baling-baling), dan `umum` (jubah dengan warna dari nama sesi). Pemetaan nama sesi ke tipe kostum ditulis di `kostum.json` lokal di samping skrip (di-gitignore karena berisi nama sesi pribadi; salin dari `kostum.contoh.json`): `{"kostum": [{"kata": ["kata di nama sesi"], "tipe": "pemahat"}]}`. Sesi yang tidak cocok memakai `umum`. Saat bekerja, tiap sesi memakai alatnya sendiri (memahat, berlatih pedang, mencatat, membaca peta, dll.); saat menunggu balasanmu, ia bersedekap sambil mengetuk kaki dan sesekali melirik jam; saat idle sesekali menggaruk kepala. Kerangka karakter punya sendi siku dan lutut, jadi jalannya lebih luwes. Ia berpindah area mengikuti tool terakhir sesi utama:
 
 | Tool | Area |
 |---|---|
