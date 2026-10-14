@@ -1,7 +1,8 @@
 # Dashboard agen Claude Code - baca transkrip subagen dari ~/.claude/projects/*/subagents secara langsung.
 # Jalankan: python agen_dashboard.py [port]   lalu buka http://localhost:8790
-# Hanya baca file; tidak mengubah apa pun. Hanya mendengar di 127.0.0.1.
-import json, os, sys, time, glob, re, threading
+# Transkrip hanya dibaca. Yang ditulis: catatan-bersama.md + state Chat Master (<CLAUDE_DIR>/desa-master/).
+# Chat Master menjalankan proses `claude -p` (alat dibatasi) atas perintah POST ber-token. Hanya mendengar di 127.0.0.1.
+import json, os, sys, time, glob, re, threading, secrets, shutil, subprocess, atexit
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
@@ -285,6 +286,9 @@ def kumpulkan_sesi(batas, sekarang):
         tg = st['tugas'][-1] if st['tugas'] else None
         mulai = (tg and tg['mulai']) or st['sesi_mulai'] or mt   # durasi = tugas yg sedang dikerjakan
         judul = st['judul'] or st['judul_ai'] or (tg['teks'][:50] if tg else sid[:8])
+        is_master = bool(st['cwd']) and os.path.normcase(os.path.normpath(st['cwd'])) == os.path.normcase(MASTER_DIR)
+        if is_master:
+            judul = 'Chat Master'  # proses koordinator milik server ini (lihat CHAT MASTER); yg lama ditandai di bawah
         riwayat = []
         for i, x in enumerate(st['tugas']):
             berikut = st['tugas'][i + 1]['mulai'] if i + 1 < len(st['tugas']) else akhir
@@ -297,7 +301,19 @@ def kumpulkan_sesi(batas, sekarang):
             'tugas_kini': tg['teks'][:300] if tg else '', 'tugas': list(reversed(riwayat))[:15],
             'sesi': sid[:8], 'judul_sesi': judul, 'proyek': st['cwd'], 'sesi_mulai': st['sesi_mulai'],
             'model': st['model'], 'token_keluar': 0, 'kunci': 'Lead:', 'jejak': list(st['jejak']),
+            **({'master': 'lama'} if is_master else {}),
         })
+    # Chat Master yg AKTIF = sesi yg dipakai panel sekarang (MASTER.sesi), atau yg terbaru kalau belum ada.
+    # Hanya itu yg dipin di atas daftar desa; sesi Master lama diberi judul "(lama)".
+    ms = [s for s in out if s.get('master')]
+    if ms:
+        kini = getattr(globals().get('MASTER'), 'sesi', None)
+        aktif = next((s for s in ms if s['id'] == 'sesi-' + str(kini)), None) or max(ms, key=lambda s: s['akhir'] or 0)
+        for s in ms:
+            if s is aktif:
+                s['master'] = 'aktif'
+            else:
+                s['deskripsi'] = s['judul_sesi'] = 'Chat Master (lama)'
     return out
 
 
@@ -465,18 +481,35 @@ def baca_qa(folder):
     return data
 
 
+def status_kini(d, t):
+    # status TERKINI = putaran terakhir yg benar2 menguji TC itu (putaran uji ulang sering parsial)
+    for tgl in reversed(d['putaran']):
+        if tgl in t['s']:
+            return t['s'][tgl]
+    return '-'
+
+
+def ringkas_katalog(kat):
+    # daftar proyek di panel Quest: nama + jumlah TC + FAIL terkini per katalog (baca_qa di-cache per mtime -> murah)
+    out = []
+    for x in kat:
+        try:
+            d = baca_qa(x['folder'])
+            ada = os.path.isdir(x['folder'])
+            out.append({'nama': x.get('nama', x['folder']), 'total': len(d['tc']), 'ada': ada,
+                        'fail': sum(1 for t in d['tc'].values() if status_kini(d, t) == 'FAIL')})
+        except Exception:
+            out.append({'nama': x.get('nama', x['folder']), 'total': 0, 'fail': 0, 'ada': False})
+    return out
+
+
 def api_qa(k):
     kat = daftar_katalog()
     if not kat:
         return {'katalog': [], 'pesan': 'Belum ada qa.json - lihat qa.contoh.json'}
     k = max(0, min(k, len(kat) - 1))
     d = baca_qa(kat[k]['folder'])
-    # status TERKINI = putaran terakhir yg benar2 menguji TC itu (putaran uji ulang sering parsial)
-    def kini(t):
-        for tgl in reversed(d['putaran']):
-            if tgl in t['s']:
-                return t['s'][tgl]
-        return '-'
+    kini = lambda t: status_kini(d, t)
     grup = []
     for g in d['grup']:
         xs = [t for t in d['tc'].values() if t['g'] == g]
@@ -488,7 +521,8 @@ def api_qa(k):
     # daftar ringkas: status per putaran; teks panjang diambil lewat /api/qa/tc
     tc = [{'id': t['id'], 'g': t['g'], 'f': t['f'][:40], 'k': t['k'][:140], 'p': t['p'], 's': t['s'], 'kini': kini(t)}
           for t in d['tc'].values()]
-    return {'katalog': [x.get('nama', x['folder']) for x in kat], 'aktif': k, 'folder': kat[k]['folder'],
+    return {'katalog': [x.get('nama', x['folder']) for x in kat], 'proyek': ringkas_katalog(kat), 'aktif': k,
+            'folder': kat[k]['folder'],
             'putaran': d['putaran'], 'grup': grup, 'tc': tc}
 
 
@@ -573,6 +607,681 @@ def penulis_catatan():
         time.sleep(CATATAN_DETIK)
 
 
+# ═════ PEMAKAIAN PLAN ═════
+# Claude Code menyimpan cache pemakaian plan (batas sesi 5 jam, mingguan, per model, kredit ekstra) di
+# `cachedUsageUtilization` dalam ~/.claude.json ($CLAUDE_CONFIG_DIR/.claude.json bila diset). Server cuma MEMBACA cache itu
+# (tidak memanggil API, tidak menyentuh kredensial) dan hanya meneruskan angka persen / waktu reset / kredit.
+_pakai = {'tanda': None, 'data': None}
+LABEL_BATAS = {'session': 'Sesi 5 jam', 'weekly_all': 'Mingguan', 'weekly_scoped': 'Mingguan'}
+ALASAN_EKSTRA = {'out_of_credits': 'kredit habis', 'user_disabled': 'dimatikan', 'spend_limit_reached': 'batas belanja tercapai'}
+
+
+def file_config_claude():
+    xs = [os.path.join(CLAUDE_DIR, '.claude.json')]
+    if not os.environ.get('CLAUDE_CONFIG_DIR'):
+        xs.insert(0, os.path.expanduser(os.path.join('~', '.claude.json')))
+    return [x for x in xs if os.path.isfile(x)]
+
+
+def ts_iso(s):
+    return ts(s) if isinstance(s, str) and s else None
+
+
+# Supaya segar: (1) tiap PAKAI_PING_MENIT, HANYA selama halaman desa terbuka (GET /api/pakai < 2 mnt lalu), server
+# menjalankan `claude -p /usage` headless: perintah lokal Claude Code (0 USD, tanpa model, tanpa transkrip) yg
+# menyegarkan cachedUsageUtilization -> api_pakai_cache membaca angka baru. 0 = mati.
+# (2) bonus gratis: event `rate_limit_event` (unifiedWindows five_hour / seven_day) dari giliran Chat Master.
+# Server tidak pernah membaca token login.
+PAKAI_PING_MENIT = 5
+PAKAI_PING_DIR = os.path.join(CLAUDE_DIR, 'desa-master', 'Ping')
+PAKAI_LIVE = {'waktu': 0, 'jendela': {}, 'sumber': ''}
+_pakai_jam = {'diminta': 0, 'ping': 0}
+
+
+def catat_rate_limit(info, sumber):
+    w = (info or {}).get('unifiedWindows') if isinstance(info, dict) else None
+    j = {}
+    for k in ('five_hour', 'seven_day'):
+        x = (w or {}).get(k)
+        if isinstance(x, dict) and isinstance(x.get('utilization'), (int, float)):
+            j[k] = {'persen': round(x['utilization'] * 100, 1), 'reset': x.get('resetsAt')}
+    if j:
+        PAKAI_LIVE.update(waktu=time.time(), jendela=j, sumber=sumber)
+
+
+def ping_pakai():
+    exe = cari_claude()
+    if not exe:
+        return
+    os.makedirs(PAKAI_PING_DIR, exist_ok=True)
+    # `/usage` = perintah lokal (tanpa model). Jangan lewat Git Bash: MSYS mengubah "/usage" jadi path Windows,
+    # lalu terkirim ke model sebagai prompt biasa. subprocess dgn daftar argumen aman dari itu.
+    cmd = [exe, '-p', '/usage', '--strict-mcp-config', '--no-session-persistence', '--output-format', 'json']
+    env = {k: v for k, v in os.environ.items() if k not in ('CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT')}
+    r = subprocess.run(cmd, cwd=PAKAI_PING_DIR, stdin=subprocess.DEVNULL, capture_output=True, text=True, encoding='utf-8',
+                       errors='replace', timeout=120, env=env, creationflags=0x08000000 if os.name == 'nt' else 0)
+    try:
+        biaya = json.loads(r.stdout).get('total_cost_usd') or 0
+    except ValueError:
+        biaya = 0
+    if biaya:  # pengaman: kalau /usage ternyata sampai ke model (versi CLI berubah), matikan ping
+        global PAKAI_PING_MENIT
+        PAKAI_PING_MENIT = 0
+        print(f'ping pemakaian memakai kuota ({biaya} USD) - dimatikan')
+
+
+def pemantau_pakai():
+    while True:
+        time.sleep(20)
+        now = time.time()
+        if PAKAI_PING_MENIT <= 0 or now - _pakai_jam['diminta'] > 120:  # mati / halaman desa tidak terbuka
+            continue
+        if now - max(PAKAI_LIVE['waktu'], _pakai_jam['ping']) < PAKAI_PING_MENIT * 60:
+            continue
+        _pakai_jam['ping'] = now  # dicatat sebelum jalan: gagal pun tidak diulang sebelum jedanya habis
+        try:
+            ping_pakai()
+        except Exception as e:
+            print('ping pemakaian gagal:', e)
+
+
+def api_pakai():
+    d = api_pakai_cache()
+    live = PAKAI_LIVE
+    if not live['waktu'] or live['waktu'] <= (d.get('diambil') or 0):
+        return d
+    # angka langsung lebih baru dari cache: timpa batas sesi 5 jam & mingguan semua model
+    d = json.loads(json.dumps(d))
+    if not d.get('ada'):
+        d = {'ada': True, 'batas': [], 'ekstra': None, 'rincian': []}
+    for k, jenis, grup, label in (('five_hour', 'session', 'session', 'Sesi 5 jam'), ('seven_day', 'weekly_all', 'weekly', 'Mingguan (semua model)')):
+        x = live['jendela'].get(k)
+        if not x:
+            continue
+        b = next((b for b in d['batas'] if b['jenis'] == jenis), None)
+        if not b:
+            b = {'jenis': jenis, 'grup': grup, 'label': label, 'parah': 'normal', 'aktif': False}
+            d['batas'].insert(0 if grup == 'session' else len(d['batas']), b)
+        b['persen'], b['reset'] = x['persen'], x['reset'] or b.get('reset')
+    d['diambil'], d['sumber'] = live['waktu'], live['sumber']
+    return d
+
+
+def api_pakai_cache():
+    files = file_config_claude()
+    tanda = tuple((f, os.path.getmtime(f), os.path.getsize(f)) for f in files)
+    if tanda == _pakai['tanda'] and _pakai['data'] is not None:
+        return _pakai['data']
+    u = None
+    for f in files:  # ambil cache paling baru bila ada lebih dari satu file config
+        try:
+            c = json.load(open(f, encoding='utf-8')).get('cachedUsageUtilization')
+        except Exception:
+            continue
+        if isinstance(c, dict) and isinstance(c.get('utilization'), dict) and \
+                (u is None or (c.get('fetchedAtMs') or 0) > (u.get('fetchedAtMs') or 0)):
+            u = c
+    if not u:
+        d = {'ada': False, 'pesan': 'Belum ada data pemakaian. Data muncul setelah Claude Code (versi baru) sempat mengecek pemakaian plan.'}
+    else:
+        ut = u['utilization']
+        batas = []
+        for x in ut.get('limits') or []:
+            if not isinstance(x, dict) or x.get('percent') is None:
+                continue
+            label = LABEL_BATAS.get(x.get('kind'), x.get('kind') or '?')
+            model = (((x.get('scope') or {}).get('model') or {}).get('display_name'))
+            if x.get('kind') == 'weekly_all':
+                label += ' (semua model)'
+            elif model:
+                label += f' ({model})'
+            batas.append({'jenis': x.get('kind'), 'grup': x.get('group'), 'label': label, 'persen': x['percent'],
+                          'reset': ts_iso(x.get('resets_at')), 'parah': x.get('severity') or 'normal', 'aktif': bool(x.get('is_active'))})
+        if not batas:  # format lama: tanpa daftar limits
+            for k, label in (('five_hour', 'Sesi 5 jam'), ('seven_day', 'Mingguan (semua model)')):
+                x = ut.get(k)
+                if isinstance(x, dict) and x.get('utilization') is not None:
+                    batas.append({'jenis': k, 'grup': 'session' if k == 'five_hour' else 'weekly', 'label': label,
+                                  'persen': x['utilization'], 'reset': ts_iso(x.get('resets_at')), 'parah': 'normal', 'aktif': False})
+        ekstra = None
+        sp = ut.get('spend')
+        if isinstance(sp, dict):
+            uang = lambda m: (m or {}).get('amount_minor', 0) / (10 ** (m or {}).get('exponent', 2)) if m else None
+            alasan = sp.get('disabled_reason') or ''
+            ekstra = {'nyala': bool(sp.get('enabled')), 'terpakai': uang(sp.get('used')), 'batas': uang(sp.get('limit')),
+                      'mata_uang': (sp.get('used') or {}).get('currency') or 'USD', 'persen': sp.get('percent'),
+                      'alasan': ALASAN_EKSTRA.get(alasan, alasan)}
+        rincian = [{'nama': r.get('display_name') or r.get('key'), 'persen': r.get('percent', 0)}
+                   for r in ((ut.get('seven_day_breakdown') or {}).get('rows') or []) if isinstance(r, dict)]
+        d = {'ada': True, 'diambil': (u.get('fetchedAtMs') or 0) / 1000, 'batas': batas, 'ekstra': ekstra, 'rincian': rincian}
+    _pakai['tanda'], _pakai['data'] = tanda, d
+    return d
+
+
+# ═════ CHAT MASTER ═════
+# Tab "Master" di /desa: user mengetik ke satu proses `claude -p` (stream-json, stdin dibiarkan terbuka) yang jadi
+# KOORDINATOR: melihat sesi lain (ListAgents), meneruskan tugas (SendMessage), menunggu balasan, merangkum ke user.
+# Balasan sesi lain otomatis memicu giliran baru Master. Alat Master dibatasi (tak bisa edit file / jalankan perintah),
+# MCP tidak dimuat. State di luar repo: <CLAUDE_DIR>/desa-master/ (sesi.json utk --resume, riwayat.jsonl, cwd Master/).
+MASTER_DIR = os.path.join(CLAUDE_DIR, 'desa-master', 'Master')
+MASTER_STATE = os.path.join(os.path.dirname(MASTER_DIR), 'sesi.json')
+MASTER_RIWAYAT = os.path.join(os.path.dirname(MASTER_DIR), 'riwayat.jsonl')
+MASTER_TOKEN = secrets.token_urlsafe(24)  # baru tiap server menyala; hanya disisipkan ke HTML /desa
+MASTER_ALAT = ['ListAgents', 'SendMessage', 'ToolSearch', 'Read', 'Glob', 'Grep']
+MASTER_LARANG = ['Bash', 'PowerShell', 'Edit', 'Write', 'NotebookEdit', 'WebFetch', 'WebSearch', 'Agent', 'Task']
+MASTER_MAKS_TEKS = 8000
+MASTER_MAKS_BODY = 20000
+# lampiran gambar (Ctrl+V di panel chat): disimpan jadi file, jalur absolutnya disisipkan ke pesan untuk Master.
+# SendMessage antar-sesi cuma teks -> Master meneruskan JALUR file, sesi tujuan membukanya dengan Read.
+MASTER_LAMPIRAN = os.path.join(os.path.dirname(MASTER_DIR), 'lampiran')
+LAMPIRAN_MAKS = 8 * 1024 * 1024
+LAMPIRAN_PER_PESAN = 4
+LAMPIRAN_SIMPAN_HARI = 7  # lampiran lebih tua dari ini dihapus saat server menyala / ada lampiran baru
+RE_LAMPIRAN = re.compile(r'^[0-9]{8}-[0-9]{6}-[0-9a-f]{8}\.(png|jpg|gif|webp)$')
+TIPE_GAMBAR = {'png': 'image/png', 'jpg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp'}
+
+
+def jenis_gambar(b):
+    # dari isi (magic bytes), bukan dari header klien
+    if b.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'png'
+    if b.startswith(b'\xff\xd8\xff'):
+        return 'jpg'
+    if b[:6] in (b'GIF87a', b'GIF89a'):
+        return 'gif'
+    if b[:4] == b'RIFF' and b[8:12] == b'WEBP':
+        return 'webp'
+    return None
+
+
+def bersihkan_lampiran():
+    batas = time.time() - LAMPIRAN_SIMPAN_HARI * 86400
+    for f in glob.glob(os.path.join(MASTER_LAMPIRAN, '*')):
+        try:
+            if RE_LAMPIRAN.match(os.path.basename(f)) and os.path.getmtime(f) < batas:
+                os.remove(f)
+        except OSError:
+            pass
+
+
+def simpan_lampiran(isi):
+    ext = jenis_gambar(isi)
+    if not ext:
+        return None
+    os.makedirs(MASTER_LAMPIRAN, exist_ok=True)
+    nama = f"{datetime.now().strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(4)}.{ext}"
+    with open(os.path.join(MASTER_LAMPIRAN, nama), 'wb') as f:
+        f.write(isi)
+    bersihkan_lampiran()
+    return nama
+MASTER_SISTEM = (
+    'Kamu CHAT MASTER di Desa Agen milik user. User mengetik ke kamu dari panel chat di browser desa. '
+    'Tugasmu KOORDINASI: pahami permintaan user, tentukan sesi Claude mana yang cocok (lihat dengan ListAgents; baca '
+    '~/.claude/catatan-bersama.md untuk tahu apa yang sedang dikerjakan tiap sesi), teruskan tugas lewat SendMessage, '
+    'tunggu balasan (balasan sesi lain masuk sebagai pesan baru), lalu rangkum ke user. '
+    'Kamu TIDAK mengerjakan tugas sendiri: tidak mengedit file, tidak menjalankan perintah. '
+    'Aturan: (1) Kalau sesi tujuan tidak jelas atau ada beberapa kandidat, tanya user dulu. '
+    '(2) Pesan ke sesi: baris pertama ringkasan yang jelas, lalu konteks lengkap; sebut bahwa ini diteruskan dari user '
+    'lewat Chat Master desa. (3) Kamu tidak bisa memberi izin atas nama user: tindakan berisiko (upload, publish, hapus, '
+    'kirim pesan keluar, push) tetap harus dikonfirmasi user langsung di sesi tujuan; sampaikan itu ke user bila relevan. '
+    '(4) Saat meneruskan balasan sesi ke user, awali dengan "[dari <nama sesi>]". (5) Jawab ringkas dalam bahasa '
+    'Indonesia santai, tanpa emoji. (6) Pesan user bisa berisi lampiran gambar berupa jalur file absolut '
+    '(baris "[Lampiran gambar: ...]"). Kamu boleh membukanya dengan Read untuk memahami isinya. Kalau tugas itu diteruskan '
+    'ke sesi lain, SELALU sertakan jalur absolut tiap gambar apa adanya di pesan SendMessage dan minta sesi tujuan '
+    'membukanya dengan Read, karena SendMessage hanya bisa mengirim teks. (7) Kalau pesan user diawali baris '
+    '"[Tujuan: <nama sesi>]", user sudah memilih sesi tujuannya dari panel: teruskan isi pesan itu ke sesi tersebut '
+    '(SendMessage to = nama itu) tanpa menanyakan tujuan lagi, kecuali pesannya jelas pertanyaan untukmu sendiri.'
+)
+
+
+# Daftar sesi tujuan utk panel Chat Master: registry Claude Code `<CLAUDE_DIR>/sessions/<pid>.json` berisi nama sesi
+# (= nama di ListAgents / SendMessage) + status busy/idle. Hanya `name`, `status`, `cwd`, `pid`, `procStart` yg dibaca;
+# file `.key` (token peer) TIDAK pernah dibuka. File milik proses yg sudah mati dilewati.
+SESI_REG = os.path.join(CLAUDE_DIR, 'sessions')
+_sesi_tujuan = {'waktu': 0, 'data': []}
+
+
+def proses_hidup(pid, mulai=None):
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if os.name == 'nt':  # os.kill(pid, 0) di Windows = TerminateProcess -> jangan dipakai
+        import ctypes
+        from ctypes import wintypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return False
+        try:
+            kode = wintypes.DWORD()
+            if not k.GetExitCodeProcess(h, ctypes.byref(kode)) or kode.value != 259:  # STILL_ACTIVE
+                return False
+            if mulai:  # PID bisa dipakai ulang proses lain: cocokkan waktu mulai (FILETIME)
+                ft = [wintypes.FILETIME() for _ in range(4)]
+                if k.GetProcessTimes(h, *[ctypes.byref(x) for x in ft]):
+                    c = (ft[0].dwHighDateTime << 32) | ft[0].dwLowDateTime
+                    try:
+                        return abs(c - int(mulai)) < 10_000_000  # selisih < 1 dtk
+                    except ValueError:
+                        return True
+            return True
+        finally:
+            k.CloseHandle(h)
+    try:
+        os.kill(pid, 0)
+        return True
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def registry_hidup():
+    # sesi Claude yg prosesnya MASIH HIDUP: [{'sid', 'nama', 'status' (sibuk/siap), 'update', 'master'}], cache 5 dtk.
+    # Dipakai chip tujuan Chat Master DAN status/nama sesi Lead di daftar desa (supaya keduanya selalu sama).
+    if time.time() - _sesi_tujuan['waktu'] < 5:
+        return _sesi_tujuan['data']
+    out = []
+    for f in glob.glob(os.path.join(SESI_REG, '*.json')):
+        try:
+            d = json.load(open(f, encoding='utf-8'))
+        except Exception:
+            continue
+        nama = d.get('name')
+        if not isinstance(nama, str) or not nama.strip() or not proses_hidup(d.get('pid'), d.get('procStart')):
+            continue
+        out.append({'sid': str(d.get('sessionId') or ''), 'nama': nama.strip()[:80],
+                    'status': 'sibuk' if d.get('status') == 'busy' else 'siap', 'update': (d.get('updatedAt') or 0) / 1000,
+                    'master': bool(d.get('cwd')) and os.path.normcase(os.path.normpath(d['cwd'])) == os.path.normcase(MASTER_DIR)})
+    _sesi_tujuan['waktu'], _sesi_tujuan['data'] = time.time(), out
+    return out
+
+
+def sesi_tujuan():
+    per_nama = {}
+    for x in registry_hidup():
+        if x['master']:
+            continue  # Master sendiri
+        if x['nama'] not in per_nama or x['update'] > per_nama[x['nama']]['update']:
+            per_nama[x['nama']] = {'nama': x['nama'], 'status': x['status'], 'update': x['update']}
+    return sorted(per_nama.values(), key=lambda x: x['nama'].lower())
+
+
+# Riwayat chat sesi tujuan (klik chip di panel Chat Master): HANYA BACA ekor transkrip sesi itu
+# (<AKAR>/*/<sessionId>.jsonl, sessionId dari registry). Item: user (prompt asli), claude (teks), masuk (pesan dari sesi
+# lain), kirim (SendMessage keluar), alat (tool berurutan digabung).
+RIWAYAT_EKOR = 3 * 1024 * 1024
+RIWAYAT_MAKS = 80
+_riwayat = {}  # path -> (ukuran, items)
+
+
+def baca_riwayat(path):
+    ukuran = os.path.getsize(path)
+    c = _riwayat.get(path)
+    if c and c[0] == ukuran:
+        return c[1]
+    with open(path, 'rb') as f:
+        f.seek(max(0, ukuran - RIWAYAT_EKOR))
+        data = f.read()
+    baris = data.split(b'\n')
+    if ukuran > RIWAYAT_EKOR and baris:
+        baris.pop(0)  # baris pertama terpotong
+    items = []
+    for b in baris:
+        if not b.strip():
+            continue
+        try:
+            j = json.loads(b)
+        except ValueError:
+            continue
+        if j.get('isSidechain') or j.get('type') not in ('user', 'assistant'):
+            continue
+        w = ts(j['timestamp']) if j.get('timestamp') else None
+        c_ = (j.get('message') or {}).get('content')
+        if j['type'] == 'user':
+            o = j.get('origin') or {}
+            if isinstance(o, dict) and o.get('kind') == 'peer':
+                items.append({'j': 'masuk', 'w': w, 'dari': str(o.get('name') or '?')[:80], 'teks': str(o.get('body') or '')[:4000]})
+                continue
+            if isinstance(c_, list) and any(isinstance(x, dict) and x.get('type') == 'tool_result' for x in c_):
+                continue
+            teks = teks_isi(c_).strip()
+            if not teks or j.get('isMeta') or j.get('isCompactSummary') or teks.startswith('<') or teks.startswith(AWALAN_BUKAN_PROMPT):
+                continue
+            teks = re.sub(r'<pasted_content[^>]*>.*?</pasted_content[^>]*>', '[tempelan]', teks, flags=re.S).strip()
+            items.append({'j': 'user', 'w': w, 'teks': teks[:4000]})
+        else:
+            for x in c_ if isinstance(c_, list) else []:
+                if not isinstance(x, dict):
+                    continue
+                if x.get('type') == 'text' and x.get('text', '').strip():
+                    items.append({'j': 'claude', 'w': w, 'teks': x['text'].strip()[:4000]})
+                elif x.get('type') == 'tool_use':
+                    nm, inp = x.get('name', ''), x.get('input') or {}
+                    if nm == 'SendMessage':
+                        items.append({'j': 'kirim', 'w': w, 'ke': str(inp.get('to') or '?')[:80],
+                                      'teks': str(inp.get('message') or '')[:1500]})
+                    elif items and items[-1]['j'] == 'alat':
+                        items[-1]['n'] += 1
+                        items[-1]['w'] = w
+                        if nama_tool(nm) not in items[-1]['nama']:
+                            items[-1]['nama'].append(nama_tool(nm))
+                    else:
+                        items.append({'j': 'alat', 'w': w, 'n': 1, 'nama': [nama_tool(nm)]})
+    items = items[-RIWAYAT_MAKS:]
+    _riwayat[path] = (ukuran, items)
+    return items
+
+
+def api_riwayat_sesi(nama):
+    x = next((r for r in sorted(registry_hidup(), key=lambda r: -r['update']) if r['nama'] == nama and not r['master']), None)
+    if not x or not re.match(r'^[0-9a-f-]{36}$', x['sid']):
+        return None
+    xs = glob.glob(os.path.join(AKAR, '*', x['sid'] + '.jsonl'))
+    if not xs:
+        return {'nama': nama, 'status': x['status'], 'item': [], 'pesan': 'Transkrip sesi ini belum ditemukan.'}
+    return {'nama': nama, 'status': x['status'], 'item': baca_riwayat(xs[0])}
+
+
+# "Perlu jawaban": sesi yg kemungkinan menunggu user (heuristik gratis, tanpa model). HANYA MENAMPILKAN:
+# izin alat tetap harus diberikan user langsung di sesi itu (desa tidak pernah menyetujui atas nama user).
+#  - tanya: proses idle (registry 'siap') + jawaban Claude terakhir berupa pertanyaan / permintaan keputusan
+#  - izin : proses sibuk tapi alat terakhir belum selesai > PERLU_IZIN_DETIK (bisa juga perintah yg memang lama)
+# Hanya frasa yg MEMINTA jawaban; kata instruksi umum ("pilih teks itu", "pilih salah satu:") sengaja tidak dihitung.
+# Dicek di PERLU_EKOR karakter terakhir saja (paragraf penutup), bukan seluruh jawaban.
+POLA_TANYA = re.compile(
+    r'\?|\b(bilang|kabari)\s*(saja|aja|ya|"|“|\*\*|kalau)|\bpilih\s+(opsi|[A-D]\b)|\bsetuju\b|\bkonfirmasi\b|'
+    r'\bmau (aku|saya|ku)\b|\bboleh(kah)? (aku|saya)\b|\bapakah\b|perlu (izin|persetujuan|keputusan)mu|'
+    r'tunggu (keputusan|konfirmasi)|\bshould i\b|\bdo you want\b|\bwould you like\b|\blet me know\b|\bwhich (option|one)\b', re.I)
+PERLU_EKOR = 400
+
+
+def teks_tanya(t):
+    # paragraf penutup tanpa tautan markdown / URL / kode inline ("?" di judul tautan bukan pertanyaan)
+    t = re.sub(r'\[[^\]]*\]\([^)]*\)', '', t[-PERLU_EKOR * 2:])
+    t = re.sub(r'https?://\S+|`[^`\n]*`', '', t)
+    return t[-PERLU_EKOR:]
+PERLU_IZIN_DETIK = 90
+
+
+def cuplik_tanya(t):
+    baris = [b.strip() for b in t.strip().split('\n') if b.strip()]
+    tanya = [b for b in baris if '?' in b or POLA_TANYA.search(b)]
+    x = (tanya[-1] if tanya else (baris[-1] if baris else ''))
+    return x if len(x) <= 240 else x[:239] + '…'
+
+
+def api_perlu():
+    out, sekarang = [], time.time()
+    for x in registry_hidup():
+        if x['master'] or not re.match(r'^[0-9a-f-]{36}$', x['sid']):
+            continue
+        xs = glob.glob(os.path.join(AKAR, '*', x['sid'] + '.jsonl'))
+        if not xs:
+            continue
+        try:
+            it = baca_riwayat(xs[0])
+        except Exception:
+            continue
+        if not it:
+            continue
+        a = it[-1]
+        if x['status'] == 'siap' and a['j'] == 'claude' and POLA_TANYA.search(teks_tanya(a['teks'])):
+            out.append({'nama': x['nama'], 'jenis': 'tanya', 'teks': cuplik_tanya(teks_tanya(a['teks'])), 'w': a['w']})
+        elif x['status'] == 'sibuk' and a['j'] == 'alat' and a['w'] and sekarang - a['w'] > PERLU_IZIN_DETIK:
+            out.append({'nama': x['nama'], 'jenis': 'izin', 'w': a['w'],
+                        'teks': f"alat {', '.join(a['nama'][-2:])} belum selesai sejak {int((sekarang - a['w']) // 60)} mnt - "
+                                'mungkin menunggu izin di sesi itu'})
+    out.sort(key=lambda y: -(y['w'] or 0))
+    return out
+
+
+def cari_claude():
+    exe = shutil.which('claude')
+    if exe:
+        return exe
+    for p in (os.path.join('~', '.local', 'bin', 'claude.exe'), os.path.join('~', '.local', 'bin', 'claude')):
+        p = os.path.expanduser(p)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+class Master:
+    def __init__(self):
+        self.kunci = threading.Lock()         # event & nomor
+        self.kunci_proses = threading.Lock()  # mulai / tulis stdin / henti
+        self.p = None
+        self.status = 'mati'  # mati / siap / sibuk
+        self.sesi = None
+        self.galat = ''
+        self.ev = []
+        self.nomor = 0
+        self.masuk_lihat = set()  # msg_id pesan masuk yg sudah dicatat (transkrip bisa dibaca ulang)
+        self.tr = {'sesi': None, 'path': None, 'offset': 0, 'sisa': b''}
+        try:
+            self.sesi = json.load(open(MASTER_STATE, encoding='utf-8')).get('sesi')
+        except Exception:
+            pass
+        try:
+            with open(MASTER_RIWAYAT, encoding='utf-8') as f:
+                for baris in f:
+                    try:
+                        e = json.loads(baris)
+                    except ValueError:
+                        continue
+                    self.nomor = max(self.nomor, e.get('id', 0))
+                    if e.get('mid'):
+                        self.masuk_lihat.add(e['mid'])
+                    self.ev.append(e)
+                    if len(self.ev) > 600:
+                        self.ev = self.ev[-400:]
+            self.ev = self.ev[-400:]
+        except OSError:
+            pass
+
+    def catat(self, jenis, teks, **lain):
+        with self.kunci:
+            self.nomor += 1
+            e = {'id': self.nomor, 'w': time.time(), 'j': jenis, 'teks': teks, **lain}
+            self.ev.append(e)
+            if len(self.ev) > 600:
+                self.ev = self.ev[-400:]
+            try:
+                os.makedirs(os.path.dirname(MASTER_RIWAYAT), exist_ok=True)
+                with open(MASTER_RIWAYAT, 'a', encoding='utf-8') as f:
+                    f.write(json.dumps(e, ensure_ascii=False) + '\n')
+            except OSError:
+                pass
+
+    def simpan_sesi(self):
+        try:
+            tmp = MASTER_STATE + '.tmp'
+            json.dump({'sesi': self.sesi}, open(tmp, 'w', encoding='utf-8'))
+            os.replace(tmp, MASTER_STATE)
+        except OSError:
+            pass
+
+    def mulai(self):
+        # dipanggil dgn kunci_proses dipegang
+        exe = cari_claude()
+        if not exe:
+            self.galat = 'perintah claude tidak ditemukan (PATH atau ~/.local/bin)'
+            return False
+        os.makedirs(MASTER_DIR, exist_ok=True)
+        cmd = [exe, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
+               '--strict-mcp-config', '--allowedTools', *MASTER_ALAT, '--disallowedTools', *MASTER_LARANG,
+               '--append-system-prompt', MASTER_SISTEM]
+        if self.sesi:
+            cmd += ['--resume', self.sesi]
+        env = {k: v for k, v in os.environ.items() if k not in ('CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT')}
+        bendera = 0x08000000 if os.name == 'nt' else 0  # CREATE_NO_WINDOW
+        try:
+            p = subprocess.Popen(cmd, cwd=MASTER_DIR, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace',
+                                 bufsize=1, env=env, creationflags=bendera)
+        except OSError as e:
+            self.galat = f'gagal menjalankan claude: {e}'
+            return False
+        self.p, self.status, self.galat = p, 'siap', ''
+        threading.Thread(target=self.baca, args=(p,), daemon=True).start()
+        return True
+
+    def cek_masuk(self):
+        # pesan dari sesi lain TIDAK muncul di stdout stream-json -> ambil dari transkrip Master:
+        # baris type=user, isMeta, origin.kind == 'peer' (name = nama sesi pengirim, body = isi)
+        sesi, tr = self.sesi, self.tr
+        if not sesi:
+            return
+        if tr['sesi'] != sesi or not tr['path']:
+            xs = glob.glob(os.path.join(AKAR, '*', sesi + '.jsonl'))
+            if not xs:
+                return
+            ukuran = os.path.getsize(xs[0])
+            tr.update(sesi=sesi, path=xs[0], offset=max(0, ukuran - EKOR_AWAL), sisa=b'')
+        try:
+            ukuran = os.path.getsize(tr['path'])
+            if ukuran < tr['offset']:
+                tr['offset'], tr['sisa'] = 0, b''
+            if ukuran == tr['offset']:
+                return
+            with open(tr['path'], 'rb') as f:
+                f.seek(tr['offset'])
+                data = tr['sisa'] + f.read()
+                tr['offset'] = ukuran
+        except OSError:
+            return
+        baris = data.split(b'\n')
+        tr['sisa'] = baris.pop()
+        for b in baris:
+            if b'"peer"' not in b:
+                continue
+            try:
+                j = json.loads(b)
+            except ValueError:
+                continue
+            o = j.get('origin') or {}
+            if j.get('type') != 'user' or not isinstance(o, dict) or o.get('kind') != 'peer':
+                continue
+            mid = o.get('msg_id') or j.get('uuid')
+            if not mid or mid in self.masuk_lihat:
+                continue
+            self.masuk_lihat.add(mid)
+            self.catat('masuk', str(o.get('body') or '')[:4000], dari=str(o.get('name') or '?')[:80], mid=mid)
+
+    def baca(self, p):
+        keluaran = []
+        for baris in p.stdout:
+            try:
+                d = json.loads(baris)
+            except ValueError:
+                if baris.strip():
+                    self.galat = baris.strip()[:300]
+                    keluaran = (keluaran + [self.galat])[-5:]
+                continue
+            if not isinstance(d, dict):
+                continue
+            t = d.get('type')
+            if t == 'system' and d.get('subtype') == 'init':
+                self.status = 'sibuk'
+                if d.get('session_id') and d['session_id'] != self.sesi:
+                    self.sesi = d['session_id']
+                    self.simpan_sesi()
+                self.cek_masuk()
+            elif t == 'assistant':
+                self.cek_masuk()
+                for c in (d.get('message') or {}).get('content') or []:
+                    if not isinstance(c, dict):
+                        continue
+                    if c.get('type') == 'text' and c.get('text', '').strip():
+                        self.catat('master', c['text'].strip())
+                    elif c.get('type') == 'tool_use':
+                        inp = c.get('input') or {}
+                        nm = c.get('name')
+                        if nm == 'SendMessage':
+                            self.catat('kirim', str(inp.get('message') or inp.get('content') or '')[:1500],
+                                       ke=str(inp.get('to') or inp.get('recipient') or '?')[:80])
+                        elif nm == 'ListAgents':
+                            self.catat('alat', 'melihat daftar sesi')
+                        elif nm in ('Read', 'Glob', 'Grep'):
+                            self.catat('alat', 'membaca ' + str(inp.get('file_path') or inp.get('pattern') or '')[-80:])
+            elif t == 'rate_limit_event':  # angka pemakaian plan terkini, gratis dari giliran Master
+                catat_rate_limit(d.get('rate_limit_info'), 'master')
+            elif t == 'result':
+                self.cek_masuk()
+                self.status = 'siap'
+                if d.get('is_error'):
+                    self.catat('galat', str(d.get('result') or d.get('subtype'))[:400])
+        p.wait()
+        if self.p is p:  # berhenti sendiri (bukan lewat henti())
+            self.status, self.p = 'mati', None
+            if any('No conversation found' in x for x in keluaran):  # sesi lama hilang: kiriman berikut mulai baru
+                self.sesi = None
+                try:
+                    os.remove(MASTER_STATE)
+                except OSError:
+                    pass
+            self.catat('sistem', 'Master berhenti' + (f' (kode {p.returncode})' if p.returncode else ''))
+
+    def kirim(self, teks, gambar=(), tujuan=''):
+        # gambar = nama file di MASTER_LAMPIRAN (sudah divalidasi); Master menerima jalur absolutnya.
+        # tujuan = nama sesi yg dipilih user di panel (sudah divalidasi) -> baris "[Tujuan: X]" di awal pesan
+        isi = teks
+        if gambar:
+            isi = (teks or '(tanpa teks, hanya gambar)') + '\n\n' + '\n'.join(
+                f'[Lampiran gambar: {os.path.join(MASTER_LAMPIRAN, g)}]' for g in gambar) + \
+                '\n(Buka dengan Read. Kalau diteruskan ke sesi lain, sertakan jalur absolut di atas apa adanya.)'
+        if tujuan:
+            isi = f'[Tujuan: {tujuan}]\n' + (isi or '(tanpa teks)')
+        lain = {}
+        if gambar:
+            lain['gambar'] = list(gambar)
+        if tujuan:
+            lain['ke'] = tujuan
+        with self.kunci_proses:
+            if not (self.p is not None and self.p.poll() is None) and not self.mulai():
+                return False
+            self.catat('kamu', teks, **lain)
+            try:
+                self.p.stdin.write(json.dumps({'type': 'user', 'message': {'role': 'user', 'content': isi}}) + '\n')
+                self.p.stdin.flush()
+                self.status = 'sibuk'
+                return True
+            except (OSError, ValueError, AttributeError) as e:
+                self.galat = str(e)
+                return False
+
+    def henti(self, lupakan=False):
+        with self.kunci_proses:
+            p, self.p = self.p, None
+            if p and p.poll() is None:
+                try:
+                    p.kill()
+                except OSError:
+                    pass
+            self.status = 'mati'
+            if lupakan:  # percakapan baru: sesi lama tidak di-resume
+                self.sesi = None
+                try:
+                    os.remove(MASTER_STATE)
+                except OSError:
+                    pass
+                self.catat('sistem', 'Percakapan baru dimulai')
+            else:
+                self.catat('sistem', 'Master dimulai ulang')
+
+    def data(self, sejak):
+        with self.kunci:
+            ev = [e for e in self.ev if e['id'] > sejak]
+            akhir = self.nomor
+        return {'status': self.status, 'sesi': self.sesi, 'galat': self.galat, 'akhir': akhir, 'ev': ev}
+
+
+MASTER = Master()
+atexit.register(lambda: MASTER.p and MASTER.p.poll() is None and MASTER.p.kill())
+
+
 RINGKAS_BUANG = ('prompt', 'laporan', 'tugas', 'jejak')
 HOST_BOLEH = ('127.0.0.1', 'localhost')
 
@@ -603,11 +1312,119 @@ class H(BaseHTTPRequestHandler):
         self.wfile.flush()
         self.close_connection = True
 
-    def do_GET(self):
+    def host_ok(self):
         # tolak Host asing: cegah DNS rebinding (situs lain membaca /api/agen lewat nama domainnya yg diarahkan ke 127.0.0.1)
         host = (self.headers.get('Host') or '').rsplit(':', 1)[0].lower()
         if host not in HOST_BOLEH:
             self.kirim(403, 'text/plain', 'host tidak diizinkan')
+            return False
+        return True
+
+    def do_POST(self):
+        # hanya Chat Master. Urutan cek: Host -> Origin -> X-Token -> ukuran -> JSON.
+        # Body dibaca/dibuang DULU: di Windows, menutup soket yg masih berisi data tak terbaca = RST, balasan 403 hilang.
+        jalur = self.path.split('?')[0]
+        maks = LAMPIRAN_MAKS if jalur == '/api/master/lampiran' else MASTER_MAKS_BODY
+        try:
+            n = int(self.headers.get('Content-Length') or 0)
+        except ValueError:
+            n = -1
+        mentah = self.rfile.read(n) if 0 < n <= maks else b''
+        if n > maks:
+            sisa = min(n, 16 * 1024 * 1024)
+            while sisa > 0:
+                b = self.rfile.read(min(65536, sisa))
+                if not b:
+                    break
+                sisa -= len(b)
+        if not self.host_ok():
+            return
+        origin = self.headers.get('Origin')
+        if origin is not None and origin not in (f'http://localhost:{PORT}', f'http://127.0.0.1:{PORT}'):
+            self.kirim(403, 'application/json', json.dumps({'error': 'origin tidak diizinkan'}))
+            return
+        if not secrets.compare_digest((self.headers.get('X-Token') or '').encode(), MASTER_TOKEN.encode()):
+            self.kirim(403, 'application/json', json.dumps({'error': 'token salah - muat ulang halaman desa'}))
+            return
+        if n < 0 or n > maks:
+            self.kirim(413, 'application/json', json.dumps({'error': f'body terlalu besar (maks {maks // 1024} KB)'}))
+            return
+        if jalur == '/api/master/lampiran':  # body = byte gambar mentah (PNG/JPEG/GIF/WebP, dicek dari isinya)
+            nama = simpan_lampiran(mentah) if mentah else None
+            if not nama:
+                self.kirim(400, 'application/json', json.dumps({'error': 'bukan gambar PNG/JPEG/GIF/WebP'}))
+            else:
+                self.kirim(200, 'application/json', json.dumps({'ok': True, 'nama': nama}))
+            return
+        try:
+            body = json.loads(mentah or b'{}')
+            if not isinstance(body, dict):
+                raise ValueError
+        except ValueError:
+            self.kirim(400, 'application/json', json.dumps({'error': 'body harus JSON objek'}))
+            return
+        if jalur == '/api/master/kirim':
+            teks = body.get('teks')
+            teks = teks.strip() if isinstance(teks, str) else ''
+            gambar = body.get('lampiran') or []
+            if not isinstance(gambar, list) or len(gambar) > LAMPIRAN_PER_PESAN or not all(
+                    isinstance(g, str) and RE_LAMPIRAN.match(g) and os.path.isfile(os.path.join(MASTER_LAMPIRAN, g)) for g in gambar):
+                self.kirim(400, 'application/json', json.dumps({'error': f'lampiran tidak valid (maks {LAMPIRAN_PER_PESAN} gambar)'}))
+                return
+            if (not teks and not gambar) or len(teks) > MASTER_MAKS_TEKS:
+                self.kirim(400, 'application/json', json.dumps({'error': f'teks kosong atau lebih dari {MASTER_MAKS_TEKS} karakter'}))
+                return
+            tujuan = body.get('tujuan') or ''
+            if tujuan and (not isinstance(tujuan, str) or tujuan not in [x['nama'] for x in sesi_tujuan()]):
+                self.kirim(400, 'application/json', json.dumps({'error': 'sesi tujuan tidak aktif lagi - pilih ulang'}))
+                return
+            ok = MASTER.kirim(teks, gambar, tujuan)
+            self.kirim(200 if ok else 500, 'application/json', json.dumps({'ok': ok, 'galat': '' if ok else MASTER.galat}))
+        elif jalur in ('/api/master/ulang', '/api/master/baru'):
+            MASTER.henti(lupakan=jalur.endswith('baru'))
+            self.kirim(200, 'application/json', json.dumps({'ok': True}))
+        else:
+            self.kirim(404, 'application/json', json.dumps({'error': 'tidak ada'}))
+
+    def do_GET(self):
+        if not self.host_ok():
+            return
+        if self.path.startswith('/api/pakai'):
+            _pakai_jam['diminta'] = time.time()  # desa sedang terbuka -> ping pemakaian boleh jalan
+            try:
+                self.kirim(200, 'application/json', json.dumps(api_pakai()))
+            except Exception as e:
+                self.kirim(500, 'application/json', json.dumps({'ada': False, 'pesan': str(e)}))
+            return
+        if self.path.split('?')[0] == '/api/master/riwayat':  # riwayat chat satu sesi tujuan (baca saja)
+            from urllib.parse import parse_qs, urlsplit
+            nama = (parse_qs(urlsplit(self.path).query).get('nama') or [''])[0]
+            try:
+                d = api_riwayat_sesi(nama)
+                self.kirim(200 if d else 404, 'application/json', json.dumps(d or {'error': 'sesi tidak aktif'}))
+            except Exception as e:
+                self.kirim(500, 'application/json', json.dumps({'error': str(e)}))
+            return
+        if self.path.split('?')[0] == '/api/master/perlu':  # sesi yg kemungkinan menunggu jawaban user
+            try:
+                self.kirim(200, 'application/json', json.dumps({'item': api_perlu()}))
+            except Exception as e:
+                self.kirim(500, 'application/json', json.dumps({'error': str(e)}))
+            return
+        if self.path.split('?')[0] == '/api/master/sesi':  # sesi tujuan utk dipilih di panel chat
+            self.kirim(200, 'application/json', json.dumps({'sesi': sesi_tujuan()}))
+            return
+        if self.path.startswith('/api/master/lampiran/'):  # gambar lampiran utk pratinjau di panel chat
+            nama = self.path.split('?')[0].rsplit('/', 1)[-1]
+            f = os.path.join(MASTER_LAMPIRAN, nama)
+            if not RE_LAMPIRAN.match(nama) or not os.path.isfile(f):
+                self.kirim(404, 'text/plain', 'tidak ada')
+                return
+            self.kirim(200, TIPE_GAMBAR[nama.rsplit('.', 1)[1]], open(f, 'rb').read())
+            return
+        if self.path.startswith('/api/master'):
+            m = re.search(r'[?&]sejak=(\d+)', self.path)
+            self.kirim(200, 'application/json', json.dumps(MASTER.data(int(m.group(1)) if m else 0)))
             return
         if self.path.split('?')[0] == '/catatan':
             try:
@@ -650,7 +1467,8 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:
                 self.kirim(500, 'application/json', json.dumps({'error': str(e)}))
         elif self.path.split('?')[0] in ('/desa', '/desa.html'):
-            self.kirim(200, 'text/html; charset=utf-8', open(os.path.join(DIR, 'desa.html'), encoding='utf-8').read())
+            html = open(os.path.join(DIR, 'desa.html'), encoding='utf-8').read()
+            self.kirim(200, 'text/html; charset=utf-8', html.replace('__TOKEN_MASTER__', MASTER_TOKEN, 1))
         elif self.path in ('/', '/index.html'):
             self.kirim(200, 'text/html; charset=utf-8', open(os.path.join(DIR, 'index.html'), encoding='utf-8').read())
         else:
@@ -662,5 +1480,8 @@ if __name__ == '__main__':
     if peringatan_sumber():
         print('PERINGATAN:', peringatan_sumber())
     print(f'Catatan bersama: {CATATAN} (tiap {CATATAN_DETIK} dtk)')
+    print(f'Chat Master: state di {os.path.dirname(MASTER_DIR)}' + ('' if cari_claude() else '  (PERINGATAN: CLI claude tidak ditemukan)'))
     threading.Thread(target=penulis_catatan, daemon=True).start()
+    threading.Thread(target=pemantau_pakai, daemon=True).start()
+    bersihkan_lampiran()
     ThreadingHTTPServer(('127.0.0.1', PORT), H).serve_forever()

@@ -7,7 +7,7 @@ Pantau pekerjaan Claude Code secara live dari browser: subagen yang sedang jalan
 
 > Untuk asisten AI yang memakai atau mengubah folder ini, ada panduan khusus di [`AGENTS.md`](AGENTS.md). Isinya penempatan, konvensi, peta kode, resep perubahan, jebakan yang sudah diketahui, dan cara menguji. `CLAUDE.md` otomatis mengarahkan Claude Code ke panduan itu.
 
-Server cuma membaca file transkrip, tidak mengubah apa pun, dan hanya mendengar di `127.0.0.1`. Satu-satunya file yang ia tulis adalah catatan bersama (`~/.claude/catatan-bersama.md`). Request dengan header `Host` selain `localhost` atau `127.0.0.1` ditolak (403), supaya situs lain tidak bisa membaca data agen lewat DNS rebinding. Akibatnya, dashboard hanya bisa dibuka lewat http://localhost:8790 atau http://127.0.0.1:8790.
+Server membaca file transkrip tanpa mengubahnya, dan hanya mendengar di `127.0.0.1`. File yang ia tulis hanya catatan bersama (`~/.claude/catatan-bersama.md`) dan state Chat Master (`~/.claude/desa-master/`). Server juga **menjalankan satu proses** `claude -p` untuk Chat Master, tapi hanya kalau ada perintah POST ber-token dari halaman desa (lihat bagian Chat Master). Request dengan header `Host` selain `localhost` atau `127.0.0.1` ditolak (403), supaya situs lain tidak bisa membaca data agen lewat DNS rebinding. Akibatnya, dashboard hanya bisa dibuka lewat http://localhost:8790 atau http://127.0.0.1:8790.
 
 ## Menjalankan
 
@@ -123,7 +123,9 @@ Supaya tidak bolak-balik, ia baru pindah setelah tool-nya stabil 5 detik (`LEAD_
   - drag untuk menggeser, scroll untuk zoom, WASD, Q/E memutar kamera 90°;
   - klik agen di daftar atau di peta untuk memindahkan kamera ke sana dan membuka panel detail;
   - arahkan kursor ke agen, slime, atau kertas Quest untuk melihat tooltip;
-  - M menyembunyikan atau menampilkan peta mini.
+  - M menyembunyikan atau menampilkan peta mini;
+  - grup **Arsip 24 jam** di daftar agen bisa dilipat dengan mengklik judulnya (tombol Sembunyikan / Tampilkan). Pilihannya diingat per browser;
+  - H (atau tombol panah di ujung kiri bar bawah) menciutkan bar tombol bawah jadi tombol panah + Master saja. Pilihannya diingat per browser.
 - **Peta mini** (kanan bawah): area, agen per warna peran, slime FAIL, dan kotak pandang kamera. Peta ikut berputar bersama kamera. Klik untuk terbang ke titik itu. Di bawahnya ada jam desa dan angka fps.
 - **Waktu:** tombol Waktu memilih Otomatis (1 menit nyata = 1 jam desa, siklus 24 menit) atau mengunci Pagi / Siang / Senja / Malam. Di malam hari lentera, jendela aula, dan lampu kedai menyala, dan kunang-kunang keluar. Pilihannya tersimpan di browser.
 - **Suara:** tombol Suara (bawaan mati) memainkan ambience yang dibuat di browser: angin, burung di siang hari, jangkrik di malam hari, api berderak, denting palu pandai besi, dan ayunan pedang. Volumenya mengikuti jarak dari kamera.
@@ -168,6 +170,49 @@ Catatannya juga bisa dilihat di http://localhost:8790/catatan.
 
 Supaya sesi benar-benar membacanya, tambahkan aturan ke memory atau CLAUDE.md, misalnya: "di awal tiap tugas, baca `~/.claude/catatan-bersama.md` kalau masih segar". Cara lain, pasang hook `UserPromptSubmit` yang mencetak isi file ini.
 
+## Pemakaian plan Claude
+
+Di bawah ringkasan panel kiri desa ada strip kecil berisi pemakaian plan Claude: batas **sesi 5 jam** dan **mingguan**, lengkap dengan bar dan persennya. Klik strip itu untuk membuka rincian: semua batas (termasuk mingguan per model), waktu reset, kredit ekstra, asal pemakaian mingguan (Claude Code, chat, dll.), dan umur datanya. Warna bar: hijau, kuning mulai 75%, merah mulai 90%.
+
+Datanya dibaca dari cache yang ditulis Claude Code sendiri (`cachedUsageUtilization` di `~/.claude.json`, atau `$CLAUDE_CONFIG_DIR/.claude.json`). Server tidak memanggil API dan tidak menyentuh kredensial. Cache itu hanya diperbarui saat Claude Code sendiri mengecek pemakaian (misalnya saat halaman usage dibuka di aplikasi), bukan tiap ada aktivitas, dan menyalakan proses `claude` baru tidak memperbaruinya. Karena itu strip menampilkan umur datanya kalau lebih dari 10 menit ("data 31 m lalu"), merah dan bertanda "mungkin basi" kalau lebih dari 30 menit.
+
+Supaya angkanya tetap segar, server menyegarkan cache itu sendiri lewat Claude Code:
+
+- **Cek otomatis** paling sering tiap 5 menit (`PAKAI_PING_MENIT`), hanya selama halaman desa terbuka. Server menjalankan `claude -p /usage` (cwd `~/.claude/desa-master/Ping/`, tanpa MCP, tanpa menyimpan transkrip). `/usage` adalah perintah lokal Claude Code, jadi **tidak memakai model dan biayanya 0**, dan hasilnya memperbarui `cachedUsageUtilization` (semua batas, termasuk per model dan kredit ekstra). Kalau suatu saat perintah ini ternyata memakan biaya (misalnya CLI berubah), ping mati sendiri. Set `PAKAI_PING_MENIT = 0` untuk mematikannya.
+- **Giliran Chat Master** (gratis): event `rate_limit_event` di output stream-json Master langsung memperbarui angka sesi 5 jam dan mingguan.
+
+Server tidak pernah membaca token login; yang mengambil angka adalah proses `claude` milik user sendiri. Jangan menjalankan `claude -p "/usage"` dari Git Bash, karena MSYS mengubah `/usage` jadi path Windows dan perintahnya terkirim ke model sebagai prompt biasa. Kalau cache belum ada, strip disembunyikan.
+
+## Chat Master (panel Master di desa)
+
+Tombol **Master** di bar bawah desa membuka jendela chat terpisah. Jendela itu bisa diseret lewat judulnya, diubah ukurannya dari tepi kiri, kanan, bawah, atau sudut bawah, dan ditutup dengan X. Posisi, ukuran, dan status buka/tutupnya diingat per browser. Di layar sempit, jendelanya menempel di bawah selebar layar. Chat ini terhubung ke satu sesi Claude yang bertugas sebagai **koordinator**. Ia melihat sesi Claude lain yang sedang aktif (`ListAgents`), membaca catatan bersama, meneruskan tugas ke sesi yang cocok (`SendMessage`), menunggu balasannya, lalu merangkum hasilnya di panel yang sama. Master tidak mengerjakan tugas sendiri.
+
+- **Syarat:** CLI `claude` (Claude Code) terpasang dan sudah login, ada di `PATH` atau di `~/.local/bin`. Tanpa itu, panel Master menampilkan galat saat mengirim; bagian desa lain tetap jalan.
+- **Proses:** `claude -p --input-format stream-json --output-format stream-json --verbose`, dijalankan saat pesan pertama dikirim dengan stdin dibiarkan terbuka. Balasan dari sesi lain otomatis memicu giliran baru Master.
+- **Panel:** gelembungmu di kanan, jawaban Master di kiri, pesan masuk dari sesi lain (hijau, "dari <sesi>"), dan baris kecil "→ <sesi>: ..." tiap kali Master mengirim pesan (klik untuk membuka isinya). Enter mengirim, Shift+Enter baris baru. **Mulai ulang** menghentikan proses (kiriman berikutnya melanjutkan percakapan lewat `--resume`), **Percakapan baru** melupakan konteks lama. Kalau ada balasan saat panel Master tertutup, tombol Master diberi titik merah.
+- **Pilih sesi tujuan:** di atas kotak ketik ada chip sesi Claude yang sedang hidup (titik kuning = sedang kerja, hijau = siap). Klik satu chip, dan pesan berikutnya dikirim dengan baris `[Tujuan: <sesi>]`, sehingga Master langsung meneruskannya ke sesi itu tanpa menebak. Pilihannya menetap sampai diklik lagi atau dibatalkan (× batal). Tanpa pilihan, Master menentukan tujuan sendiri. Daftarnya dibaca dari registry sesi Claude Code (`~/.claude/sessions/<pid>.json`: nama dan status saja; file token di sebelahnya tidak dibuka), dan sesi yang prosesnya sudah mati dilewati.
+- **Riwayat sesi:** memilih chip sesi juga membuka tab **Riwayat <sesi>** di panel: 80 pesan terakhir sesi itu (pesan user, jawaban Claude, pesan masuk dari sesi lain, pesan keluar, dan ringkasan alat), diperbarui tiap 4 detik. Riwayatnya hanya dibaca dari transkrip sesi, tidak pernah ditulis. Tab **Chat Master** kembali ke percakapan dengan Master, dan diberi titik merah kalau Master membalas saat kamu sedang melihat riwayat. Sesudah mengirim pesan, panel otomatis kembali ke tab Chat Master.
+- **Perlu jawabanmu:** panel kecil di atas tengah layar muncul kalau ada sesi yang kemungkinan menunggu kamu. Judul tab browser ikut diberi angka, misalnya "(1) Desa Agen". Ada dua jenis, keduanya dideteksi dengan aturan sederhana tanpa model (gratis):
+  - **tanya:** sesi sedang idle dan jawaban terakhir Claude berupa pertanyaan atau permintaan keputusan (diakhiri `?`, "bilang restart", "pilih A/B", "setuju", dan sejenisnya).
+  - **izin?:** sesi sibuk tapi alat terakhirnya belum selesai lebih dari 90 detik. Kemungkinan menunggu izin alat, tapi bisa juga perintah yang memang lama.
+
+  Klik item untuk membuka Chat Master dengan sesi itu sebagai tujuan, lengkap dengan riwayat dan sarannya. Tombol × menyembunyikan item sampai ada pertanyaan baru, dan klik judul panel untuk melipatnya. Item hilang sendiri setelah sesi itu dijawab. Panel ini **hanya menampilkan**: izin alat tetap diberikan langsung di sesi tujuan, desa tidak bisa menyetujui apa pun atas namamu.
+- **Saran pesan:** saat sebuah sesi dipilih, muncul sampai 4 saran pesan berikutnya di atas kotak ketik, misalnya "restart", "commit", "pilih A", atau "status sekarang?". Saran disusun dari jawaban terakhir sesi itu dengan aturan sederhana di browser (gratis, tanpa model). Klik saran untuk mengisi kotak ketik; pesannya tidak langsung terkirim.
+- **Ukuran jendela:** lebar bawaan 420 px. Tarik tepi kiri, tepi kanan, tepi bawah, atau sudut bawah (sudut kanan bawah bergaris) untuk mengubah ukuran. Ukurannya diingat per browser.
+- **Tempel gambar:** Ctrl+V di kotak ketik menempelkan gambar dari clipboard (PNG, JPEG, GIF, WebP; maksimal 4 gambar per pesan, masing-masing 8 MB). Gambar tampil sebagai pratinjau kecil yang bisa dibatalkan dengan ×, dan boleh dikirim tanpa teks. Saat dikirim, gambar disimpan ke `~/.claude/desa-master/lampiran/` dan jalur absolutnya disisipkan ke pesan untuk Master. Karena `SendMessage` antar-sesi hanya bisa teks, Master meneruskan **jalur file** itu ke sesi tujuan, lalu sesi tujuan membukanya dengan Read. Lampiran yang lebih tua dari 7 hari dihapus otomatis.
+- **Di daftar agen:** Chat Master yang sedang dipakai panel selalu dipin paling atas (grup "Chat Master"), lengkap dengan statusnya. Sesi Master sebelumnya (sesudah "Percakapan baru") tampil sebagai "Chat Master (lama)" di grup biasa.
+- **Di peta:** tiap pesan Master ke sebuah sesi diterbangkan sebagai gulungan surat bercahaya dari Aula Guild ke karakter Lead sesi tujuan. Master sendiri tampil sebagai Lead bernama "Chat Master" yang berjaga di papan Balai Guild.
+- **Biaya:** tiap giliran Master memakai kuota Claude Code akun yang login (giliran pendek sekitar 0,26 USD).
+- **State** (di luar repo): `~/.claude/desa-master/sesi.json` (id sesi untuk `--resume`), `riwayat.jsonl` (riwayat chat), `lampiran/` (gambar tempelan), dan folder kerja proses `Master/`.
+
+**Pengaman:**
+
+- Alat Master dibatasi ke `ListAgents`, `SendMessage`, `ToolSearch`, `Read`, `Glob`, `Grep`. Bash, PowerShell, Edit, Write, WebFetch, Agent, dan sejenisnya dilarang. MCP tidak dimuat (`--strict-mcp-config`).
+- Lampiran dicek dari isinya (magic bytes PNG/JPEG/GIF/WebP), bukan dari header, dan nama filenya dibuat server. `/api/master/kirim` hanya menerima nama lampiran yang memang ada di folder lampiran.
+- Semua POST wajib membawa header `X-Token`. Token dibuat baru tiap server menyala dan hanya disisipkan ke HTML `/desa`, jadi halaman yang dibuka sebelum server restart perlu dimuat ulang.
+- POST dengan `Origin` selain `http://localhost:<port>` / `http://127.0.0.1:<port>` ditolak 403, begitu juga `Host` asing. Body hanya JSON, maksimal 20 KB, teks maksimal 8000 karakter.
+- Pesan Master ke sesi lain **bukan izin user**. Sesi penerima memperlakukannya sebagai permintaan rekan kerja, dan tindakan berisiko (upload, publish, hapus, kirim keluar, push) tetap harus kamu konfirmasi langsung di sesi tujuan.
+
 ## Quest QA (katalog test case)
 
 Test case QA ikut tampil di desa, sebagai **Papan Quest** di belakang Balai Guild.
@@ -177,7 +222,11 @@ Test case QA ikut tampil di desa, sebagai **Papan Quest** di belakang Balai Guil
   ```json
   {"katalog": [{"nama": "Nama proyek", "folder": "C:\\path\\ke\\folder\\QA"}]}
   ```
-  Kalau ada lebih dari satu katalog, bisa dipilih dari panel.
+  Satu entri = satu proyek. Isi beberapa entri kalau QA-nya dari beberapa proyek, misalnya:
+  ```json
+  {"katalog": [{"nama": "Game A", "folder": "C:\...\GameA\QA"}, {"nama": "Game B", "folder": "C:\...\GameB\QA"}]}
+  ```
+- **Daftar proyek:** di atas tab Quest QA ada daftar semua proyek dari `qa.json`, masing-masing dengan jumlah test case dan FAIL. Desa hanya menampilkan papan, kertas, dan slime milik proyek yang dipilih; proyek lain disembunyikan. Pilihan proyek diingat per browser. Proyek yang belum punya test case tetap muncul di daftar, dengan papan kosong.
 - **Status terkini:** status dari putaran terakhir yang benar-benar menguji test case itu, karena putaran uji ulang biasanya hanya sebagian.
 
 **Di desa:**
@@ -210,8 +259,18 @@ Data QA dimuat ulang tiap 30 detik. Papan dan slime hanya dibangun ulang kalau a
 | `GET /api/agen?jam=24&ringkas=1` | daftar tanpa `prompt` / `laporan` / `tugas` (dipakai desa) |
 | `GET /api/agen/detail?id=<id>` | satu agen, lengkap |
 | `GET /catatan` | isi catatan bersama terakhir (teks markdown) |
-| `GET /api/qa?k=0` | katalog QA ke-k: putaran, ringkasan grup, daftar test case + status per putaran + `kini` |
+| `GET /api/qa?k=0` | katalog QA ke-k: putaran, ringkasan grup, daftar test case + status per putaran + `kini`; `proyek` = ringkasan semua katalog (nama, total, fail, ada) untuk daftar proyek |
 | `GET /api/qa/tc?k=0&id=GUA-011` | satu test case: rincian dari TestPlan + hasil tiap putaran |
+| `GET /api/pakai` | pemakaian plan dari cache Claude Code: `batas` (label, persen, reset, severity, aktif), `ekstra` (kredit ekstra), `rincian` (asal pemakaian mingguan), `diambil` (waktu cache) |
+| `GET /api/master?sejak=N` | Chat Master: `status` (`mati` / `siap` / `sibuk`), `sesi`, `galat`, `akhir` (id event terakhir), dan event dengan id > N |
+| `POST /api/master/kirim` | body `{"teks": "...", "lampiran": ["<nama>", ...], "tujuan": "<sesi>"}`: kirim pesan ke Master (`tujuan` opsional, harus ada di `/api/master/sesi`) (menyalakan prosesnya kalau mati). Wajib `X-Token`. |
+| `GET /api/master/riwayat?nama=<sesi>` | riwayat chat satu sesi yang hidup (baca saja): `item` = `user` / `claude` / `masuk` / `kirim` / `alat`, maksimal 80 terakhir |
+| `GET /api/master/perlu` | sesi yang kemungkinan menunggu user: `item` = `{nama, jenis: tanya / izin, teks, w}` |
+| `GET /api/master/sesi` | sesi Claude yang hidup untuk dipilih sebagai tujuan: `nama` (= nama di ListAgents), `status` (`sibuk` / `siap`) |
+| `POST /api/master/lampiran` | body = byte gambar mentah (maks 8 MB) → `{"nama": "..."}`. Wajib `X-Token`. Nama ini dikirim lewat `lampiran` di `/api/master/kirim`. |
+| `GET /api/master/lampiran/<nama>` | gambar lampiran (untuk pratinjau di panel chat) |
+| `POST /api/master/ulang` | hentikan proses Master; kiriman berikutnya melanjutkan percakapan (`--resume`). Wajib `X-Token`. |
+| `POST /api/master/baru` | hentikan Master dan mulai percakapan baru. Wajib `X-Token`. |
 
 ## Menambah peran atau animasi
 
@@ -222,6 +281,7 @@ Data QA dimuat ulang tiap 30 detik. Papan dan slime hanya dibangun ulang kalau a
 
 - Yang tampil hanya subagen dan sesi utama di komputer ini. Perintah background Bash tidak ikut. Sesi cloud (claude.ai/code) juga tidak bisa terbaca, karena transkripnya ada di container jarak jauh, bukan di disk lokal.
 - Riwayat tugas sesi utama hanya mencakup 8 MB terakhir transkrip.
+- Chat Master hanya bisa menjangkau sesi yang terlihat oleh `ListAgents` di komputer ini. Kurir di peta hanya terbang kalau sesi tujuannya sedang tampil sebagai Lead (nama sesi sama dengan nama di `ListAgents`).
 - Kalau tab browser tidak sedang dibuka, animasi diperlambat browser dan berjalan normal lagi saat tab dibuka.
 - Mode Ultra (ambient occlusion dan bayangan 4096) cukup berat. Pakai Normal kalau fps di peta mini turun di bawah 50.
 - Respons HTTP sengaja ditulis per 16 KB, plus `TCP_NODELAY` dan `Connection: close`. Di Windows, satu write lebih dari ~60 KB pernah macet sekitar 19 detik. Jangan digabung lagi jadi satu write.

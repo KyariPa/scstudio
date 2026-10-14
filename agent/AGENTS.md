@@ -14,6 +14,8 @@ Dashboard Agen adalah server Python stdlib kecil yang **membaca transkrip Claude
 | `/desa` | Desa Agen: desa RPG 3D bergaya diorama HD (Three.js + post-processing). Tiap agen jadi karakter chibi yang bekerja di area sesuai perannya, dan animasinya mengikuti tool yang sedang ia pakai. Ada juga Papan Quest QA (test case), slime FAIL, siklus siang-malam, dan peta mini. |
 | `/catatan` | catatan bersama antar sesi Claude (teks markdown) |
 
+Di `/desa` ada juga panel **Chat Master** (tombol Master di bar bawah): jendela chat terpisah ke satu proses `claude -p` yang menjadi koordinator sesi-sesi Claude lain (lihat **Chat Master** di bagian 4).
+
 Yang dibaca:
 
 - **Subagen:** `<CLAUDE_DIR>/projects/<proyek>/<sesi>/subagents/agent-<id>.jsonl`, plus `.meta.json` di sebelahnya.
@@ -22,9 +24,11 @@ Yang dibaca:
 
 `CLAUDE_DIR` = `$CLAUDE_CONFIG_DIR`, atau `~/.claude` kalau variabel itu tidak diset.
 
-Satu-satunya file yang **ditulis** server adalah `<CLAUDE_DIR>/catatan-bersama.md` (tiap 15 detik). Selain itu server tidak mengubah apa pun, dan hanya mendengar di `127.0.0.1`.
+Pemakaian plan Claude (sesi 5 jam, mingguan) dibaca dari cache Claude Code di `~/.claude.json` (`cachedUsageUtilization`), tanpa memanggil API.
 
-Tidak ada build step, tidak ada dependensi pip, tidak ada npm. Three.js 0.160.0 (plus addon `examples/jsm`: postprocessing dan `BufferGeometryUtils`) dimuat lewat importmap dari jsdelivr, jadi halaman desa butuh internet. Semua tekstur dibuat prosedural di canvas, tanpa file aset.
+File yang **ditulis** server hanya `<CLAUDE_DIR>/catatan-bersama.md` (tiap 15 detik) dan state Chat Master di `<CLAUDE_DIR>/desa-master/`. Server juga **menjalankan proses** `claude -p` (Chat Master) dan **menerima POST**, tapi hanya untuk Chat Master dan hanya dengan token (bagian 6, jebakan 17-20). Server hanya mendengar di `127.0.0.1`.
+
+Tidak ada build step, tidak ada dependensi pip, tidak ada npm. Chat Master butuh CLI `claude` (Claude Code) yang sudah login, di `PATH` atau `~/.local/bin`; tanpa itu hanya panel Master yang tidak berfungsi. Three.js 0.160.0 (plus addon `examples/jsm`: postprocessing dan `BufferGeometryUtils`) dimuat lewat importmap dari jsdelivr, jadi halaman desa butuh internet. Semua tekstur dibuat prosedural di canvas, tanpa file aset.
 
 ---
 
@@ -139,8 +143,18 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 | `kumpulkan(jam)` | gabung subagen + sesi utama, hitung estimasi (peran + kata pertama, lalu per peran, lalu median; Lead tidak diestimasi), urutkan, tambahkan `akar` dan `peringatan` |
 | `peringatan_sumber()` | pesan kalau folder transkrip tidak ada atau masih kosong |
 | `baca_qa`, `api_qa`, `api_qa_tc` | katalog QA. Cache memakai mtime file. `kini` = status dari putaran terakhir yang benar-benar menguji TC itu (putaran uji ulang biasanya parsial). |
+| `status_kini`, `ringkas_katalog` | status terkini satu TC; ringkasan semua katalog (`proyek`: nama, total, fail, ada folder) untuk daftar proyek di panel Quest |
 | `susun_catatan`, `penulis_catatan` | catatan bersama; thread daemon tiap `CATATAN_DETIK` = 15, ditulis atomik lewat `.tmp` + `os.replace` |
-| `class H` / `kirim()` | HTTP: tulis per 16 KB, `TCP_NODELAY`, `Connection: close`, cek `Host` |
+| `PAKAI_LIVE`, `catat_rate_limit`, `ping_pakai`, `pemantau_pakai` | penyegaran pemakaian. `ping_pakai` menjalankan `claude -p /usage --strict-mcp-config --no-session-persistence --output-format json` (cwd `desa-master/Ping`): perintah lokal, biaya 0, memperbarui `cachedUsageUtilization`; kalau `total_cost_usd` > 0, `PAKAI_PING_MENIT` diset 0 (pengaman). Thread `pemantau_pakai` hanya melakukan ping kalau `/api/pakai` diminta kurang dari 2 menit lalu (halaman desa terbuka), paling sering tiap `PAKAI_PING_MENIT` = 5 (0 = mati); waktu percobaan dicatat sebelum jalan, jadi kalau gagal tidak diulang terus. `PAKAI_LIVE` diisi gratis dari event `rate_limit_event` giliran Master (`unifiedWindows.five_hour` / `seven_day`, `utilization` 0..1). **Jangan** pakai `--bare` (tidak membaca login), jangan membaca `.credentials.json`, dan jangan menguji `/usage` lewat Git Bash (MSYS mengubahnya jadi path, lalu terkirim ke model). |
+| `file_config_claude`, `api_pakai` | pemakaian plan: baca `cachedUsageUtilization` dari `~/.claude.json` (atau `$CLAUDE_CONFIG_DIR/.claude.json`; kalau dua-duanya ada, ambil `fetchedAtMs` terbaru), cache per mtime (`api_pakai_cache`). `api_pakai` menimpa batas `session` / `weekly_all` dengan `PAKAI_LIVE` kalau lebih baru dari `fetchedAtMs`, lalu menambah `sumber` (`master` / `ping`). Hanya meneruskan persen, waktu reset, kredit ekstra, dan rincian asal pemakaian; `accountUuid` dan field lain tidak dikirim. `LABEL_BATAS` = label per `kind`. |
+| `MASTER_*`, `cari_claude()` | Chat Master: path state (`MASTER_DIR` = cwd proses, `MASTER_STATE` = `sesi.json`, `MASTER_RIWAYAT` = `riwayat.jsonl`, semua di `<CLAUDE_DIR>/desa-master/`), `MASTER_TOKEN` (baru tiap server menyala), `MASTER_ALAT` / `MASTER_LARANG`, batas teks/body, prompt sistem `MASTER_SISTEM` |
+| `MASTER_LAMPIRAN`, `jenis_gambar`, `simpan_lampiran`, `bersihkan_lampiran` | lampiran gambar Chat Master: `<CLAUDE_DIR>/desa-master/lampiran/<yyyymmdd-hhmmss>-<hex8>.<ext>` (`RE_LAMPIRAN`), jenis dari magic bytes, maks `LAMPIRAN_MAKS` = 8 MB, `LAMPIRAN_PER_PESAN` = 4, dihapus setelah `LAMPIRAN_SIMPAN_HARI` = 7 (saat server menyala dan tiap ada lampiran baru) |
+| `RIWAYAT_*`, `baca_riwayat`, `api_riwayat_sesi` | riwayat chat sesi tujuan: nama dari registry (proses hidup, bukan Master) ke `sessionId` ke `<AKAR>/*/<sessionId>.jsonl`; baca ekor 3 MB (`RIWAYAT_EKOR`), cache per ukuran file, maks 80 item. `user` (prompt asli, aturan saring sama dengan `baca_sesi`), `claude` (teks), `masuk` (`origin.kind == 'peer'`), `kirim` (SendMessage), `alat` (tool berurutan digabung jadi satu item). Hanya baca. |
+| `POLA_TANYA`, `cuplik_tanya`, `api_perlu` | "Perlu jawaban" (heuristik, tanpa model): per proses hidup (bukan Master), item terakhir `baca_riwayat`. `tanya` = registry `siap` + item `claude` yang cocok `POLA_TANYA` di `teks_tanya()` (`PERLU_EKOR` = 400 karakter terakhir, tautan markdown / URL / kode inline dibuang dulu). Pola hanya frasa yang meminta jawaban (`?`, "bilang/kabari saja", "pilih opsi/A-D", setuju, konfirmasi, "mau aku", "should I", dll); kata instruksi seperti "pilih salah satu:" sengaja tidak dihitung. `izin` = registry `sibuk` + item `alat` lebih tua dari `PERLU_IZIN_DETIK` = 90. Hanya menampilkan; **jangan** menambah aksi yang menyetujui izin atas nama user. |
+| `SESI_REG`, `proses_hidup`, `registry_hidup`, `sesi_tujuan` | sesi tujuan Chat Master dari registry `<CLAUDE_DIR>/sessions/<pid>.json` (hanya `name`, `status`, `cwd`, `pid`, `procStart`; file `.key` berisi token peer **jangan pernah dibuka**). Proses mati dilewati: di Windows lewat `OpenProcess` + `GetExitCodeProcess` + waktu mulai (`GetProcessTimes` vs `procStart`, cegah PID dipakai ulang). **Jangan** pakai `os.kill(pid, 0)` di Windows, karena itu = TerminateProcess. `registry_hidup()` = semua proses hidup (cache 5 dtk, field `master` menandai proses Master). `sesi_tujuan()` membuang Master sendiri; nama ganda diambil yang `updatedAt` terbaru. |
+| `class Master` / `MASTER` | `mulai` (Popen `claude -p` stream-json, stdin tetap terbuka, `--resume` kalau ada `sesi`), `baca` (thread: stdout jadi event), `cek_masuk` (pesan masuk dari transkrip), `kirim(teks, gambar, tujuan)` (`tujuan` jadi baris pertama `[Tujuan: X]` dan field `ke` di event `kamu`; jalur absolut lampiran disisipkan ke pesan untuk Master sebagai baris `[Lampiran gambar: ...]`; event `kamu` menyimpan nama file di `gambar`), `henti(lupakan)`, `data(sejak)`. Event: `kamu`, `master`, `kirim` (`ke`), `masuk` (`dari`, `mid`), `alat`, `sistem`, `galat`. Status: `mati` / `siap` / `sibuk`. |
+| `kumpulkan_sesi` (Chat Master) | sesi yang `cwd`-nya `MASTER_DIR` diberi judul `Chat Master` dan field `master`: `aktif` untuk `MASTER.sesi` (atau yang terbaru kalau belum ada), sisanya `lama` dengan judul `Chat Master (lama)` |
+| `class H` / `kirim()` | HTTP: tulis per 16 KB, `TCP_NODELAY`, `Connection: close`, `host_ok()` (cek `Host`). `do_POST` hanya untuk `/api/master/*`. |
 
 **API:**
 
@@ -148,9 +162,21 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 |---|---|
 | `/api/agen?jam=24[&ringkas=1]` | daftar lengkap. `ringkas=1` membuang `prompt`, `laporan`, `tugas`, `jejak`. |
 | `/api/agen/detail?id=` | satu agen atau sesi (id sesi = `sesi-<uuid>`) |
-| `/api/qa?k=` | katalog QA ke-k |
+| `/api/qa?k=` | katalog QA ke-k, plus `proyek` (ringkasan semua katalog) |
 | `/api/qa/tc?k=&id=GUA-011` | satu test case |
 | `/catatan` | isi catatan bersama |
+| `/api/pakai` | pemakaian plan: `ada`, `diambil`, `batas[]` (`jenis`, `grup`, `label`, `persen`, `reset`, `parah`, `aktif`), `ekstra`, `rincian`; atau `ada: false` + `pesan` |
+| `GET /api/master?sejak=N` | Chat Master: `status`, `sesi`, `galat`, `akhir` (id event terakhir; kalau lebih kecil dari `sejak`, riwayat direset dan klien memuat ulang), event dengan id > N. Cukup cek `Host`. |
+| `POST /api/master/kirim` | body `{"teks": "...", "lampiran": [nama, ...], "tujuan": "..."}` ke `MASTER.kirim()` (`tujuan` harus salah satu nama dari `sesi_tujuan()`, jadi tidak bisa menyisipkan baris lain) (menyalakan proses kalau mati). Teks boleh kosong kalau ada lampiran; nama lampiran harus cocok `RE_LAMPIRAN` dan filenya ada. |
+| `GET /api/master/sesi` | `{"sesi": [{"nama", "status", "update"}]}` dari `sesi_tujuan()` |
+| `GET /api/master/perlu` | `{"item": api_perlu()}` |
+| `GET /api/master/riwayat?nama=` | `api_riwayat_sesi(nama)`: `{nama, status, item[]}`, atau 404 kalau sesi tidak hidup. Jalur ini harus dicek **sebelum** `startswith('/api/master')` yang umum. |
+| `POST /api/master/lampiran` | body = byte gambar mentah (batas `LAMPIRAN_MAKS`, bukan 20 KB) → `{"nama"}` |
+| `GET /api/master/lampiran/<nama>` | file lampiran (nama dicek `RE_LAMPIRAN`, jadi tak bisa keluar folder) |
+| `POST /api/master/ulang` | `MASTER.henti()`: kiriman berikutnya melanjutkan lewat `--resume` |
+| `POST /api/master/baru` | `MASTER.henti(lupakan=True)`: hapus `sesi.json`, percakapan baru |
+
+Semua POST: cek `Host`, lalu `Origin` (kalau ada, harus `http://localhost:<PORT>` / `http://127.0.0.1:<PORT>`), lalu `X-Token` (`secrets.compare_digest`), `Content-Length` paling besar 20000, JSON objek, dan `teks` (str, di-strip, tidak kosong, paling panjang 8000). Tidak ada `do_OPTIONS`, jadi preflight CORS lintas situs gagal (501).
 
 ### `desa.html` (urutan bagian di `<script type="module">`)
 
@@ -164,13 +190,16 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 | DUNIA | `HIDUP[]` = animasi dunia `f(t, dt)` per frame. `SUASANA` (lampu, malam, jam). Tanah: `tinggi(x,z)`, `sungaiZ`, `KOLAM`, mask canvas `kMask` (R = jalan, G = tepi air) yang dibaca shader tanah dan `bacaMask()`. Helper: `alas` (bertekstur), `jalan` (kurva S dilukis ke mask), `api`, `asapDari`, `baraLayang`, `lentera`, `bendera` / `benderaDi`, `umbul`, `tong`, `peti`, `pagar`, dll. `PARTIKEL[]` + `grupPartikel()`. `AREA` + `RADIUS` = pusat dan jari-jari tiap area. Pembangun area per peran, Aula Guild, sungai/kolam/jembatan/ladang. `bangunTanah()`, `bebas()`, `bangunPohon()` (InstancedMesh), rumput & bunga instanced. |
 | ATMOSFER | `KUNCI_JAM` (warna dan kekuatan cahaya per jam), `atmosfer(dt)`, `LAMPU_MALAM` (5 PointLight tetap), kunang-kunang, daun gugur, burung, `SUARA` (WebAudio prosedural) |
 | STASIUN KERJA | `buatStasiun(props, pembangunProp)`: agen berdiri di **samping** properti (`kananLayar`), bukan di belakang. Properti yang dibuat pembangun ditandai `userData.dinamis`. `STASIUN[peran]` + `STASIUN.Lead_<Area>`, `areaLead()`, `ambilSlot` / `lepasSlot` |
-| QUEST QA | `QUEST` (state), `bangunQuest` (papan berbingkai per grup + kertas perkamen `InstancedMesh` + slime FAIL), `soroti`, `ambilQuest` (tiap 30 detik), `gambarQuest` (tab panel kiri), `pilihTC` (detail TC) |
+| QUEST QA | `QUEST` (state; `katalog` = proyek terpilih, diingat di `localStorage.desaQuestProyek`), `bangunQuest` (papan berbingkai per grup + kertas perkamen `InstancedMesh` + slime FAIL; hanya proyek terpilih), `soroti`, `ambilQuest` (tiap 30 detik), `gambarQuest` (tab panel kiri: daftar proyek `.qpr`, grup, filter, daftar TC), `pilihTC` (detail TC) |
+| CHAT MASTER | (setelah `gantiTab`) jendela `#master` terpisah (bukan tab), dibuka tombol `#bMaster` di bar bawah. `TOKEN_MASTER` (placeholder `__TOKEN_MASTER__`, diganti server saat `/desa` dilayani; harus muncul **sekali** saja di file), `MCHAT` (state), `barisChat` / `gambarChat` (teks lewat `esc()`, plus `` `kode` `` dan `**tebal**`), `ambilChat` (polling 1,5 dtk saat panel terbuka, 5 dtk saat tidak; satu permintaan sekaligus lewat `MCHAT.sedang`; titik `#bMaster.baru` untuk balasan belum dibaca), `postMaster` (header `X-Token`). Sesi tujuan: `MCHAT.sesi` / `MCHAT.tujuan`, `ambilSesi` (saat panel dibuka + tiap 10 dtk), chip di `#mSesi` (`gambarSesi`; pilihan menetap, klik lagi / batal untuk melepas). Memilih chip juga membuka tab riwayat: `MCHAT.lihat` (`master` / `riwayat`), `#mTab` (`gambarTab`; titik `baru` di tab Chat Master lewat `MCHAT.belumTab`), `ambilRiwayat` (tiap 4 dtk saat dilihat), `barisRiwayat`; `gambarChat` punya cabang riwayat. Riwayat diambil selama ada tujuan (bukan hanya saat tab riwayat dilihat), karena juga dipakai saran: `saranDari(riw)` (aturan dari jawaban `claude` terakhir: opsi A–D, restart / commit / push / upload, pertanyaan, error; maks 4) lalu `gambarSaran` ke `#mSaran`; klik saran mengisi `#mTeks`, tidak mengirim. Sesudah kirim, atau saat galat, tampilan kembali ke `master`. Lampiran: `MCHAT.lamp` (blob + object URL), paste di `#mTeks` (teks biasa tetap tertempel; `preventDefault` hanya kalau clipboard tanpa teks), pratinjau `#mLamp` (× = `buangLamp`), saat kirim `unggahLamp` per gambar lalu `kirim` dengan `lampiran`. Jendela: `bukaChat`, seret lewat `#mJudul`, ukuran lewat pegangan `.mrz` (`w` / `e` / `s` / `sw` / `se`; pointer capture, `body.ukurPanel` mencegah seleksi teks; min 280×260, dijepit ke layar), `lepasJangkarM` (dari jangkar kanan-bawah ke left/top saat pertama dibuka), `jepitPanelM` (tetap di layar), simpan ke `localStorage.desaMaster` (`buka`, `x`, `y`, `w`, `h`). Ukur posisi pakai `offset*`, bukan `getBoundingClientRect` (animasi `muncul` memakai `scale`), dan jangan ukur saat panel tertutup atau viewport 0. Kurir: `terbangkanKurir(ke)` mencari Lead dengan `judul_sesi` / `deskripsi` = nama tujuan (tanpa beda huruf besar-kecil), lalu gulungan emisif terbang lengkung 2,5 dtk dari `AREA.Aula`; digerakkan satu fungsi `HIDUP` atas daftar `KURIR`, mesh-nya `userData.dinamis`. `areaLead()` menaruh Lead `Chat Master` selalu di papan Balai Guild. |
+| PERLU JAWABAN | (di dalam blok Chat Master, sebelum handler `#mSaran`) `PERLU` (item, `tutup` = kunci `nama|w|jenis` yang disembunyikan di `localStorage.desaPerluTutup`, `ciut` di `desaPerluCiut`), `ambilPerlu` (tiap 8 dtk), `gambarPerlu` (panel `#perlu` di atas tengah + angka di `document.title`). Klik item: `bukaChat`, set `MCHAT.tujuan` + `lihat = 'riwayat'`, `ambilRiwayat`. |
+| PEMAKAIAN PLAN | (setelah kurir) `PAKAI`, `ambilPakai` (tiap 30 dtk), `gambarPakai` (strip `#pakai` di header panel kiri: batas sesi + mingguan semua model), `gambarRinciPakai` (panel `#pakaiRinci`: semua batas, reset, kredit ekstra, umur data; lebih dari 30 menit = basi). Warna bar `warnaPakai`: hijau, kuning mulai 75%, merah mulai 90% (atau `severity` dari cache). |
 | KARAKTER CHIBI | `matK()` (shading halus + rim light), `gabungAnak()` (gabung mesh per tulang), `buatKarakter(peran, id)`: kerangka `pinggul` → `leher` / `bahuK` / `bahuKi` / `pahaK` / `pahaKi`, `mata` (kedip), `bayang` (bayangan kontak), alat di tangan kanan (`s.al`), kostum per peran, warna kulit dan rambut dari `hashTeks(id)` |
 | AGEN DI DUNIA | `animDari` (tool ke animasi), `buatAgenDunia`, `tempatkan` (tujuan menurut status, alur lapor → kedai → pulang), `sinkron` (data ke dunia; jeda pindah area untuk Lead), `tulisLabel` |
 | ANIMASI | `pose(o, dt)` dengan `switch` per animasi (`tempa`, `panas`, `celup`, `baca`, `uji`, `teropong`, `tulis`, `tidur`, `santai`, `lapor`, `perintah`, `jalan`), napas, kedip, `animLead`, `langkah` |
 | DATA | `buatDemo` / `majuDemo` (tombol Demo), `semuaAgen`, `ambil` (polling `/api/agen?ringkas=1`) |
-| UI | `gambarDaftar`, `detailDari` (ambil detail per agen), `gambarDetail` / `gambarDetailLead`, `pilih` |
-| KONTROL KAMERA | drag, scroll, WASD, Q/E, `pick()` (agen, slime, kertas TC lewat `instanceId`, papan) |
+| UI | `gambarDaftar` (entri `master === 'aktif'` dipin paling atas di grup "Chat Master" dengan teks status, `.item.pin`; grup Arsip 24 jam bisa dilipat: `arsipSembunyi`, `localStorage.desaArsip`, klik `.grpLipat`), `detailDari` (ambil detail per agen), `gambarDetail` / `gambarDetailLead`, `pilih` |
+| KONTROL KAMERA | drag, scroll, WASD, Q/E, `pick()` (agen, slime, kertas TC lewat `instanceId`, papan); `aturKontrol(ciut)` menciutkan bar tombol bawah (`#kontrol.ciut`, tombol `#bKontrol` / H, `localStorage.desaKontrol`), tombol `#bMaster` tetap tampil |
 | STATIC BATCHING | `gabungStatis()`: mesh dunia yang tidak digerakkan `HIDUP` digabung per material (sekali, sebelum data pertama) |
 | KUALITAS GRAFIS / LOOP | `kualitas` (`hemat` / `normal` / `ultra`), `terapkanKualitas`, saran hemat saat fps di bawah 40, lalu loop: kamera, bayangan, agen, partikel, `atmosfer`, `HIDUP`, render (composer atau langsung), peta mini |
 | TOOLTIP / PETA MINI | tooltip hover (`pick` tiap 70 ms), `PETA` (dasar dari mask, diputar sesuai `kam.az`, klik = terbang), fps, tombol M; parser hash `#kam=` / `waktu=` |
@@ -243,6 +272,12 @@ Semua nama variabel dan fungsi berbahasa Indonesia. Ikuti gaya itu.
 14. **Mask tanah dibangun sekali.** `jalan()` atau lukisan air setelah `bangunTanah()` tidak akan tampil, dan `bacaMask()` menyimpan piksel pada panggilan pertama.
 15. **Wajah karakter:** mata, alis, dan mulut harus sedikit di **luar** permukaan bola kepala (radius 0.37). Kalau tidak, mereka tenggelam dan wajah tampak polos. `SphereGeometry` parsial untuk rambut belakang memakai `phiStart = π`, `phiLength = π` (setengah belakang); rentang penuh akan menutupi wajah.
 16. **Hemat melewati composer.** Efek yang hanya ada di `GRADE` / bloom (tint siang-malam, vinyet) tidak muncul di mode Hemat. Warna dasar siang-malam tetap jalan karena diatur lewat cahaya dan kabut.
+17. **Body POST dibaca dulu sebelum menolak.** Di Windows, menutup soket yang masih berisi data tak terbaca mengirim RST, sehingga balasan 403 tidak sampai ke klien (`ConnectionResetError`). `do_POST` membaca body (sampai batas jalurnya: 20 KB, atau 8 MB untuk lampiran; kalau lebih, dibuang sampai 16 MB) sebelum cek Host/Origin/token. Jangan dipindah ke belakang.
+18. **Pesan masuk dari sesi lain tidak muncul di stdout `stream-json`.** Yang muncul hanya giliran baru Master (`system/init`, `assistant`, `result`). Isinya diambil `cek_masuk()` dari transkrip Master `<CLAUDE_DIR>/projects/*/<sesi>.jsonl`: baris `type=user`, `isMeta`, `origin.kind == 'peer'` (`origin.name` = pengirim, `origin.body` = isi, `origin.msg_id` untuk dedup). Kalau format ini berubah, event `masuk` berhenti muncul, tapi Master tetap menjawab dengan awalan "[dari <sesi>]".
+19. **Token Master baru tiap server menyala.** Halaman `/desa` yang dibuka sebelum restart mengirim token lama dan ditolak 403 ("token salah"). Ini disengaja. Jangan menyimpan token ke disk atau ke repo. Halaman menanganinya sendiri lewat `postToken`: kalau 403 menyebut token, `segarkanToken()` mengambil `/desa` (same-origin, situs lain tidak bisa membacanya) dan mengulang POST sekali. `TOKEN_MASTER` karena itu `let`, dan regex-nya mencari `let TOKEN_MASTER = '...'`. Kalau kiriman tetap gagal, teks dikembalikan ke kotak ketik dan alasannya tampil di `#mGalat` (`galatForm`), tepat di atas kotak ketik.
+20. **Pengaman Master jangan dilonggarkan:** tetap `127.0.0.1`, cek `Host` dan `Origin`, `X-Token`, `--strict-mcp-config` tanpa `--mcp-config`, dan daftar `MASTER_LARANG`. Master bisa memerintah sesi lain, jadi alat yang bisa mengubah file atau menjalankan perintah tidak boleh diberikan padanya. Pesannya bukan izin user (lihat `MASTER_SISTEM`).
+21. **Input teks di panel menahan tombol kamera.** Handler `keydown` global (WASD, Q/E, M) melewati target `INPUT` / `TEXTAREA` / `SELECT`. Kalau menambah kolom ketik baru, pakai salah satu tag itu.
+22. **`ThreadingHTTPServer` di Windows memakai `SO_REUSEADDR`,** jadi bisa "berhasil" bind ke port yang sudah dipakai proses lain, dan request uji malah dijawab proses lain. Pilih port uji yang bebas (cek `netstat`), atau set `ThreadingHTTPServer.allow_reuse_address = False` di skrip uji.
 
 ---
 
@@ -265,6 +300,18 @@ s.shutdown()
 EOF
 ```
 
+Untuk Chat Master, tambahkan ke skrip di atas (set `A.PORT = 8796` sebelum membuat server, karena cek `Origin` memakai `PORT`):
+
+- `GET /api/master?sejak=0` harus 200;
+- `/desa` berisi `A.MASTER_TOKEN` dan tidak lagi berisi `__TOKEN_MASTER__`;
+- POST `/api/master/kirim` tanpa token, token salah, `Origin` asing, atau `Host` asing: 403. Body lebih dari 20000 byte: 413. Teks kosong, lebih dari 8000 karakter, atau bukan JSON objek: 400.
+
+Uji sungguhan (memakai kuota Claude, sekitar 0,26 USD per giliran) lewat panel Master:
+
+1. "sesi apa saja yang aktif?": Master menjawab daftar sesi.
+2. "tolong tanya sesi X, balas OK": muncul baris kurir ke X, event `masuk` dari X, lalu "[dari X] OK".
+3. Matikan dan nyalakan server, lalu kirim lagi: riwayat tetap ada dan Master ingat konteksnya (`--resume`).
+
 3. **Uji di browser:** buka `/desa`, tekan **Demo** (6 agen tiruan, satu di antaranya selesai sekitar 25 detik kemudian), klik agen di daftar dan di peta, buka tab **Quest QA**, klik kertas dan slime, arahkan kursor ke agen (tooltip), klik peta mini, lalu putar tombol **Grafis** (Normal → Ultra → Hemat) dan **Waktu**. Console harus bersih.
    - Hash URL mempercepat uji visual: `/desa#kam=-34,8,1.6` (pusat kamera x, z, zoom, opsional jumlah putaran 90°) dan `&waktu=malam` (`pagi` / `siang` / `senja` / `malam` / `otomatis`).
    - Chromium headless di container cloud memakai GPU software (SwiftShader). Fps di sana tidak mewakili GPU sungguhan (1080p dengan composer kurang dari 3 fps), jadi pakai untuk screenshot dan cek error saja. Kalau screenshot Ultra timeout, naikkan timeout atau pakai viewport lebih kecil.
@@ -286,4 +333,7 @@ EOF
 - Hanya **lokal**. Sesi cloud (claude.ai/code) tidak terbaca, karena transkripnya ada di container jarak jauh. Perintah background Bash juga tidak ditampilkan.
 - Format transkrip adalah format **internal** Claude Code. Kode ini diuji di Claude Code 2.1.295 lewat aplikasi desktop Windows. Kalau field berubah (misalnya nama `SubagentHandback`, `stop_reason`, `isMeta`, atau `custom-title`), sesuaikan `baca_baru` / `baca_sesi`.
 - Riwayat tugas Lead hanya mencakup 8 MB terakhir transkrip.
+- Pemakaian plan hanya sesegar cache Claude Code. `cachedUsageUtilization` adalah format internal; kalau field-nya berubah (`limits`, `kind`, `percent`, `resets_at`, `spend`), sesuaikan `api_pakai`.
+- Chat Master hanya menjangkau sesi yang terlihat oleh `ListAgents` di komputer ini. Nama tujuan `SendMessage` harus sama dengan judul sesi Lead (tanpa beda huruf besar-kecil) agar kurir terbang.
+- Proses Master ikut berhenti kalau server mati, termasuk dimatikan paksa (tanpa `atexit`), karena stdin-nya tertutup. Ia menyala lagi saat pesan berikutnya dikirim.
 - `jalankan.bat` membuka browser sebelum server siap, jadi muatan pertama kadang perlu di-refresh. Di Windows ia juga butuh perintah `python`; launcher `py` belum ditangani.

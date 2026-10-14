@@ -26,6 +26,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fc5a8;font:14px/1.45
 #daftar{overflow:auto;padding:6px 8px 10px;flex:1}
 .grp{font:700 11px/1.2 var(--serif);letter-spacing:.08em;color:var(--emas);margin:12px 6px 5px;text-transform:uppercase;display:flex;align-items:center;gap:8px}
 .grp::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,rgba(168,118,30,.6),transparent)}
+.item .stTeks{font-size:10.5px;color:var(--teks3);flex:none}
+.item.pin{background:rgba(232,196,106,.18);border-color:rgba(168,118,30,.35)}
+.grpLipat{cursor:pointer;user-select:none}.grpLipat::after{order:1}.grpLipat .mbtn{order:2;text-transform:none;letter-spacing:0;font-family:system-ui,sans-serif;font-weight:400}
 .item{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:7px;cursor:pointer;border:1px solid transparent;transition:background .15s,border-color .15s}
 .item:hover{background:rgba(120,80,30,.09)}
 .item.pilih{border-color:var(--emas);background:rgba(232,196,106,.25);box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
@@ -57,6 +60,8 @@ details summary{cursor:pointer;color:#8a5a1e;font-size:12.5px;margin-top:8px;fon
 #kontrol{left:320px;bottom:12px;padding:6px 8px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100% - 540px);
   background:var(--kertas),linear-gradient(#6b4423,#4a2e18);border-color:var(--kayu2)}
 #kontrol .bantu{font-size:11.5px;color:#e8d4ac;padding:0 6px}
+#kontrol #bKontrol{padding:5px 8px;min-width:28px}
+#kontrol.ciut>:not(#bKontrol):not(#bMaster){display:none}  /* bar tombol disembunyikan: tinggal tombol panah (H) + Master */
 /* label di atas kepala (CSS2D) */
 .lbl{text-align:center;pointer-events:none;white-space:nowrap}
 .lbl .isi{transform:translateY(-50%)}  /* CSS2D memusatkan elemen di titik; geser supaya dasar label = di atas kepala */
@@ -80,11 +85,106 @@ details summary{cursor:pointer;color:#8a5a1e;font-size:12.5px;margin-top:8px;fon
 .qgn{display:flex;justify-content:space-between;font-size:12.5px}.qgn span{color:var(--teks3)}
 .qbar{display:flex;height:7px;border-radius:4px;overflow:hidden;margin-top:4px;gap:1px;border:1px solid rgba(90,59,34,.25)}.qbar i{display:block}
 .qchips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.qproyek{display:flex;flex-direction:column;gap:3px;margin:2px 0 8px;padding-bottom:8px;border-bottom:1px solid rgba(90,59,34,.2)}
+.qpr{display:flex;justify-content:space-between;align-items:center;gap:8px;font:inherit;font-size:12.5px;text-align:left;padding:6px 9px;border-radius:7px;border:1px solid transparent;background:none;color:var(--teks);cursor:pointer}
+.qpr:hover{background:rgba(120,80,30,.09)}.qpr.on{border-color:var(--emas);background:linear-gradient(rgba(240,204,106,.35),rgba(212,164,71,.25));font-weight:700}
+.qpr span{font-weight:400;color:var(--teks3);font-size:11.5px;white-space:nowrap}
 .qchip{font:inherit;font-size:11.5px;padding:2px 9px;border-radius:999px;border:1px solid #b89a6a;background:rgba(255,250,235,.6);color:var(--teks2);cursor:pointer}.qchip.on{border-color:var(--emas);color:#2a1a0c;background:linear-gradient(#f0cc6a,#d4a447)}
 .qid{font-size:11.5px;font-weight:700;color:var(--teks2);flex:none;font-variant-numeric:tabular-nums}
 .qk{font-size:11.5px;color:var(--teks3);margin-top:8px}.qv{font-size:12.5px;color:var(--teks);white-space:pre-wrap;word-break:break-word}
 .qh{padding:7px 0;border-top:1px solid var(--garis)}
 .qpill{display:inline-block;font-size:11px;font-weight:700;color:#1a1a1a;padding:1px 8px;border-radius:6px;border:1px solid rgba(0,0,0,.2)}
+/* Chat Master */
+#master{right:12px;bottom:242px;width:420px;height:min(520px,calc(100% - 266px));min-width:280px;min-height:260px;max-width:calc(100% - 16px);max-height:calc(100% - 16px);
+  display:none;flex-direction:column;z-index:12;overflow:hidden}
+/* pegangan ubah ukuran (tepi kiri/kanan/bawah + 2 sudut bawah); sudut kanan bawah diberi garis supaya terlihat */
+.mrz{position:absolute;z-index:3;touch-action:none;user-select:none}
+body.ukurPanel{user-select:none}
+.mrz-w{left:0;top:40px;bottom:14px;width:7px;cursor:ew-resize}.mrz-e{right:0;top:40px;bottom:14px;width:7px;cursor:ew-resize}
+.mrz-s{left:14px;right:14px;bottom:0;height:7px;cursor:ns-resize}
+.mrz-sw{left:0;bottom:0;width:14px;height:14px;cursor:nesw-resize}
+.mrz-se{right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 45%,#a8761e 45%,#a8761e 52%,transparent 52%,transparent 64%,#a8761e 64%,#a8761e 71%,transparent 71%)}
+.mrz:hover{background-color:rgba(168,118,30,.18)}
+#master.buka{display:flex;animation:muncul .22s ease-out}
+.mjudul{display:flex;align-items:center;gap:8px;padding:8px 10px 7px 12px;cursor:move;user-select:none;touch-action:none;border-bottom:1px solid var(--garis);background:linear-gradient(rgba(255,250,235,.5),transparent)}
+.mjudul b{font:700 15px/1.2 var(--serif);color:var(--kayu2);letter-spacing:.02em}.mjudul span{font-size:11px;color:var(--teks3)}
+.mjudul .tutup{margin-left:auto;background:none;border:0;color:var(--kayu);font-size:22px;cursor:pointer;line-height:1;padding:0 2px}
+.mstat{display:flex;align-items:center;gap:7px;padding:7px 12px;font-size:12px;color:var(--teks2);border-bottom:1px solid var(--garis)}
+.mstat .dot{width:8px;height:8px}.d-sibuk{background:#e8b830;box-shadow:0 0 6px #e8b830;animation:kedip 1s ease-in-out infinite}.d-siap{background:#3fbf7a}.d-mati{background:#9a917e}
+@keyframes kedip{50%{opacity:.35}}
+#mStatus{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mstat .ktl{margin-left:auto;display:flex;gap:4px;flex:none}
+.mbtn{font:inherit;font-size:11px;padding:2px 7px;border-radius:5px;border:1px solid #b89a6a;background:rgba(255,250,235,.6);color:var(--teks2);cursor:pointer}.mbtn:hover{background:rgba(232,196,106,.35)}
+#mLog{flex:1;min-height:0;overflow:auto;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.mg{max-width:88%;padding:6px 9px;border-radius:9px;font-size:12.5px;line-height:1.42;white-space:pre-wrap;word-break:break-word;border:1px solid var(--garis)}
+.mg code{font:11.5px ui-monospace,Consolas,monospace;background:rgba(90,59,34,.1);padding:0 3px;border-radius:3px}
+.mg-kamu{align-self:flex-end;background:linear-gradient(#f0d48a,#e2bd66);border-color:#b8913a;color:#2a1a0c;border-bottom-right-radius:3px}
+.mg-master{align-self:flex-start;background:rgba(255,252,240,.85);border-bottom-left-radius:3px}
+.mg-masuk{align-self:flex-start;background:rgba(214,232,206,.7);border-color:rgba(60,110,50,.3);border-bottom-left-radius:3px}
+.mg .dari{display:block;font:700 10.5px/1.3 var(--serif);letter-spacing:.04em;color:#4a6a30;margin-bottom:2px}
+.mk{font-size:11.5px;color:var(--teks2)}.mk summary{margin:0;font-weight:400;color:var(--teks2)}.mk summary b{color:var(--kayu)}
+.mk pre{max-height:160px;margin:4px 0 0}
+.mx{font-size:11px;color:var(--teks3);text-align:center}.mx.galat{color:#a83228}
+.mkosong{font-size:12.5px;color:var(--teks3);padding:10px 4px;line-height:1.5}
+#mTab{display:none;gap:4px;padding:6px 10px 0}#mTab.ada{display:flex}
+#mTab button{flex:1;font:inherit;font-size:11.5px;padding:4px 6px;border-radius:6px 6px 0 0;border:1px solid #b89a6a;border-bottom:0;background:rgba(255,250,235,.5);color:var(--teks2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;position:relative}
+#mTab button.on{background:linear-gradient(#f0cc6a,#d4a447);color:#2a1a0c;font-weight:700;border-color:var(--emas)}
+#mTab button.baru::after{content:"";position:absolute;top:3px;right:4px;width:7px;height:7px;border-radius:50%;background:#d8403a}
+.mriwket{font-size:11px;color:var(--teks3);text-align:center;padding:2px 0 4px}
+#mSesi{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 10px;border-top:1px solid var(--garis);max-height:64px;overflow:auto}
+#mSesi .lbl2{font-size:11px;color:var(--teks3);margin-right:2px}
+.msc{display:inline-flex;align-items:center;gap:4px;font:inherit;font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid #b89a6a;background:rgba(255,250,235,.6);color:var(--teks2);cursor:pointer}
+.msc:hover{background:rgba(232,196,106,.3)}.msc.on{border-color:var(--emas);color:#2a1a0c;background:linear-gradient(#f0cc6a,#d4a447);font-weight:700}
+.msc i{width:7px;height:7px;border-radius:50%;flex:none}.msc i.sibuk{background:#e8a83a}.msc i.siap{background:#3fae5a}
+#mSesi .batal{font-size:11px;color:#a83228;cursor:pointer;background:none;border:0;padding:0 4px}
+.mg .ke{display:block;font-size:10.5px;font-weight:700;opacity:.75;margin-bottom:2px}
+#mSesi+#mLamp{border-top:0}
+#mSaran{display:none;flex-wrap:wrap;gap:4px;padding:6px 10px 0}#mSaran.ada{display:flex}
+#mSaran .lbl2{font-size:11px;color:var(--teks3);margin-right:2px;align-self:center}
+.msr{font:inherit;font-size:11.5px;padding:2px 9px;border-radius:999px;border:1px dashed #a8761e;background:rgba(255,250,235,.75);color:var(--kayu2);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msr:hover{background:rgba(232,196,106,.35);border-style:solid}
+#mLamp{display:none;flex-wrap:wrap;gap:6px;padding:7px 10px 0;border-top:1px solid var(--garis)}#mLamp.ada{display:flex}
+#mLamp+#mForm{border-top:0}
+.mli{position:relative;width:58px;height:58px;border-radius:6px;overflow:hidden;border:1px solid #b89a6a;background:#fdf7e6}
+.mli img{width:100%;height:100%;object-fit:cover;display:block}
+.mli button{position:absolute;top:1px;right:1px;width:18px;height:18px;padding:0;border-radius:50%;border:1px solid #5a3b22;background:rgba(42,26,12,.8);color:#fbecc8;font-size:12px;line-height:15px;cursor:pointer}
+.mlket{font-size:11px;color:var(--teks3);align-self:center}
+.mg .gbr{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.mg .gbr img{max-width:120px;max-height:90px;border-radius:5px;border:1px solid rgba(90,59,34,.35);display:block;cursor:zoom-in}
+#mGalat{display:none;margin:6px 10px 0;padding:5px 8px;border-radius:6px;background:rgba(216,64,58,.12);border:1px solid rgba(168,50,40,.4);color:#8a2018;font-size:11.5px}#mGalat.ada{display:block}
+#mForm{display:flex;gap:6px;padding:8px 10px 10px;border-top:1px solid var(--garis);align-items:flex-end}
+#mTeks{flex:1;resize:none;font:inherit;font-size:12.5px;line-height:1.4;background:#fdf7e6;color:var(--teks);border:1px solid #b89a6a;border-radius:6px;padding:6px 8px;min-height:36px;max-height:140px}
+#mKirim{font:inherit;font-size:12.5px;cursor:pointer;color:#2a1a0c;border:1px solid #5a3b22;border-radius:6px;padding:7px 11px;background:linear-gradient(#e2b456,#a8761e);box-shadow:0 2px 0 #2a1a0c}
+#bMaster.baru{position:relative}#bMaster.baru::after{content:"";position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:#d8403a;border:1px solid #fbecc8}
+/* Pemakaian plan Claude (strip di kepala panel kiri + panel rincian) */
+#pakai{display:none;width:100%;margin-top:7px;padding:5px 7px;border-radius:7px;border:1px solid var(--garis);background:rgba(255,250,235,.5);cursor:pointer;font:inherit;text-align:left;color:var(--teks)}
+#pakai:hover{background:rgba(232,196,106,.25)}#pakai.on{border-color:var(--emas)}
+.pkb{display:grid;grid-template-columns:62px 1fr 34px;align-items:center;gap:6px;font-size:11px;color:var(--teks2);line-height:1.5}
+.pkb b{font-weight:700;text-align:right;font-variant-numeric:tabular-nums;color:var(--teks)}
+.pkbar{display:block;height:6px;border-radius:3px;background:rgba(90,59,34,.15);overflow:hidden;border:1px solid rgba(90,59,34,.2)}.pkbar i{display:block;height:100%;border-radius:3px}
+#pakaiRinci{left:320px;top:12px;width:300px;max-height:calc(100% - 90px);overflow:auto;padding:12px 14px;display:none;animation:muncul .22s ease-out}
+#pakaiRinci h2{font:700 15px/1.3 var(--serif);margin:0 0 2px;color:var(--kayu2)}
+#pakaiRinci .tutup{position:absolute;right:10px;top:4px;background:none;border:0;color:var(--kayu);font-size:22px;cursor:pointer;line-height:1}
+.pkr{padding:7px 0;border-top:1px solid var(--garis)}.pkr:first-of-type{border-top:0}
+.pkr .atas{display:flex;justify-content:space-between;font-size:12.5px}.pkr .atas b{font-variant-numeric:tabular-nums}
+.pkr .bawah{font-size:11px;color:var(--teks3);margin-top:3px}
+.pkr .pkbar{height:8px;margin-top:4px}
+.pkket{font-size:11px;color:var(--teks3);margin-top:8px;line-height:1.45}
+/* Perlu jawaban: sesi yg kemungkinan menunggu user (hanya menampilkan; izin tetap diberikan di sesinya) */
+#perlu{left:50%;top:12px;transform:translateX(-50%);width:min(380px,calc(100% - 24px));padding:0;display:none;z-index:13;overflow:hidden}
+#perlu.ada{display:block}
+#perlu .pkep{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;user-select:none;font:700 13px/1.2 var(--serif);color:var(--kayu2)}
+#perlu .pkep .jml{min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:#d8403a;color:#fff;font:700 11.5px/20px system-ui,sans-serif;text-align:center;animation:denyut 1.6s ease-in-out infinite}
+@keyframes denyut{50%{box-shadow:0 0 0 5px rgba(216,64,58,.18)}}
+#perlu .pkep .ket{margin-left:auto;font:400 11px system-ui,sans-serif;color:var(--teks3)}
+#perlu .pdaf{max-height:260px;overflow:auto;border-top:1px solid var(--garis)}
+#perlu.ciut .pdaf{display:none}
+.pit{display:flex;gap:8px;align-items:flex-start;padding:7px 10px 7px 12px;border-bottom:1px solid var(--garis);cursor:pointer}
+.pit:hover{background:rgba(232,196,106,.22)}
+.pit .isi{flex:1;min-width:0;font-size:12px;line-height:1.4}.pit .isi b{font-family:var(--serif);color:var(--kayu2)}
+.pit .isi .q{display:block;color:var(--teks2);white-space:pre-wrap;word-break:break-word}
+.pit .isi .w{font-size:10.5px;color:var(--teks3)}
+.pit .jn{font-size:10px;font-weight:700;padding:1px 6px;border-radius:5px;flex:none;margin-top:2px}.jn-tanya{background:#f3d27a;color:#4a2e0a}.jn-izin{background:#e8a090;color:#4a140c}
+.pit .x{background:none;border:0;color:var(--teks3);font-size:16px;cursor:pointer;line-height:1;padding:0 2px}
 .lblSlime{background:rgba(120,20,20,.88);color:#fff;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:5px;pointer-events:none;border:1px solid #f0a090}
 .lblSlime{display:none}.dekat .lblSlime,.lblSlime.on{display:block}
 #galat{z-index:20;position:fixed;left:50%;top:12px;transform:translateX(-50%);background:linear-gradient(#8a2a20,#6a1a14);color:#fff;padding:6px 14px;border-radius:7px;border:1px solid #e8a090;display:none;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.4)}
@@ -99,6 +199,10 @@ details summary{cursor:pointer;color:#8a5a1e;font-size:12.5px;margin-top:8px;fon
   #kiri{width:230px;bottom:auto;max-height:44%}
   #kanan{left:12px;right:12px;width:auto;top:auto;bottom:60px;max-height:46%}
   #kontrol{left:12px;right:12px;max-width:none}
+  #kontrol.ciut{right:auto}
+  #master{left:12px!important;right:12px!important;top:auto!important;bottom:60px!important;width:auto!important;height:55%!important}
+  .mrz{display:none}
+  #pakaiRinci{left:12px;right:12px;width:auto;top:auto;bottom:60px;max-height:46%}
   #kontrol .bantu,#peta{display:none}
 }
 </style>
@@ -108,16 +212,32 @@ details summary{cursor:pointer;color:#8a5a1e;font-size:12.5px;margin-top:8px;fon
 <div id="dunia"></div>
 <aside id="kiri" class="panel">
   <header><h1>Desa Agen <a href="/">dashboard</a></h1><div class="ringkas" id="ringkas">memuat...</div>
+    <button id="pakai" title="Pemakaian plan Claude - klik untuk rincian"></button>
     <div class="tabs"><button class="tab on" data-tab="agen">Agen</button><button class="tab" data-tab="quest">Quest QA</button></div></header>
   <div id="daftar"></div>
   <div id="quest" style="display:none"></div>
 </aside>
+<aside id="master" class="panel" aria-label="Chat Master">
+    <span class="mrz mrz-w" data-a="w"></span><span class="mrz mrz-e" data-a="e"></span><span class="mrz mrz-s" data-a="s"></span><span class="mrz mrz-sw" data-a="sw" title="Ubah ukuran"></span><span class="mrz mrz-se" data-a="se" title="Ubah ukuran"></span>
+    <div class="mjudul" id="mJudul" title="Seret untuk memindahkan, tarik sudut kanan bawah untuk mengubah ukuran"><b>Chat Master</b><span>koordinator sesi</span><button class="tutup" id="mTutup" aria-label="Tutup">&times;</button></div>
+    <div class="mstat"><span class="dot d-mati" id="mDot"></span><span id="mStatus">memuat...</span>
+      <span class="ktl"><button class="mbtn" id="mUlang" title="Hentikan proses Master. Kiriman berikutnya melanjutkan percakapan yang sama.">Mulai ulang</button><button class="mbtn" id="mBaru" title="Hentikan Master dan mulai percakapan baru (konteks lama dilupakan).">Percakapan baru</button></span></div>
+    <div id="mTab"><button type="button" data-v="master" class="on">Chat Master</button><button type="button" data-v="riwayat">Riwayat</button></div>
+    <div id="mLog"></div>
+    <div id="mSesi"></div>
+    <div id="mSaran"></div>
+    <div id="mLamp"></div>
+    <div id="mGalat" role="alert"></div>
+    <form id="mForm"><textarea id="mTeks" rows="2" maxlength="8000" placeholder="Tulis ke Master... (Enter kirim, Shift+Enter baris baru, Ctrl+V tempel gambar)"></textarea><button id="mKirim" type="submit">Kirim</button></form>
+</aside>
+<aside id="pakaiRinci" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="pakaiIsi"></div></aside>
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
 <div id="kontrol" class="panel">
-  <button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
+  <button id="bKontrol" title="Sembunyikan tombol (H)" aria-label="Sembunyikan tombol">&#9664;</button><button id="bMaster" title="Buka/tutup Chat Master">Master</button><button id="bKiri" title="Putar kiri (Q)">&#8634; Q</button><button id="bKanan" title="Putar kanan (E)">E &#8635;</button>
   <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: maks 60 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift, maks 60 fps, resolusi dinamis. Ultra: + ambient occlusion, bayangan tajam, resolusi lebih tinggi.">Grafis: Normal</button>
-  <span class="bantu">Drag geser · Scroll zoom · WASD · Q/E putar · M peta</span>
+  <span class="bantu">Drag geser · Scroll zoom · WASD · Q/E putar · M peta · H tombol</span>
 </div>
+<div id="perlu" class="panel" aria-live="polite"><div class="pkep" title="Klik untuk melipat"><span class="jml">0</span><span>Perlu jawabanmu</span><span class="ket">klik item untuk membuka sesinya</span></div><div class="pdaf"></div></div>
 <div id="galat"></div>
 <div id="tip"></div>
 <div id="peta" class="panel" title="Peta desa - klik untuk terbang ke titik itu (tombol M: sembunyikan)"><canvas id="petaK" width="376" height="376"></canvas><div class="kaki"><span id="petaJam">-</span><span id="petaFps">- fps</span></div></div>
@@ -1052,6 +1172,7 @@ STASIUN.Lead_Document = {slot: buatStasiun([V(C4.x+0.2, 0, C4.z+6.3)], meja)};
 STASIUN.Lead_Guild = {slot: [-1.4, 1.4].map(x => ({pos: V(TITIK.papan.x+x, 0, TITIK.papan.z+2.3), yaw: Math.PI, pakai: null}))};
 // area kerja Lead dari tool terakhir sesi utama
 function areaLead(a){
+  if (a.deskripsi === 'Chat Master') return 'Guild';  // koordinator Chat Master selalu berjaga di papan guild
   if (a.status === 'menunggu') return 'Kedai';
   const t = (a.tool_akhir || '').toLowerCase(), d = (a.detail_akhir || '').toLowerCase(), ada = (...k) => k.some(x => t.includes(x));
   if (ada('agent','sendmessage','workflow','taskstop','spawn','schedule')) return 'Guild';
@@ -1078,6 +1199,8 @@ const WARNA_QA = {'PASS':0x3fae5a, 'FAIL':0xd8403a, 'JANGGAL':0xe8b830, 'BLOCKED
 const NAMA_QA = {'PASS':'PASS', 'FAIL':'FAIL', 'JANGGAL':'JANGGAL', 'BLOCKED':'BLOCKED', 'TIDAK BISA DIUJI':'TBD', '-':'belum'};
 const QC = AREA.Quest, KOLOM = 18, PETAK = 0.28, KANAN_Q = V(Math.cos(Math.PI/4), 0, -Math.sin(Math.PI/4));
 const QUEST = {data:null, tanda:'', papan:[], slime:[], kertasDari:new Map(), putaran:'kini', katalog:0, pilih:null, filterS:'', filterG:'', cari:''};
+// proyek QA terpilih diingat per browser (papan, kertas & slime desa hanya milik proyek ini)
+try { QUEST.katalog = Math.max(0, parseInt(localStorage.getItem('desaQuestProyek') || '0', 10) || 0); } catch (e) {}
 const sorot = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.32, 0.03), emisif(0xffffff, 2.2)); sorot.visible = false; scene.add(sorot);
 const statusTC = t => QUEST.putaran === 'kini' ? (t.kini || '-') : (t.s[QUEST.putaran] || '-');
 
@@ -1162,6 +1285,7 @@ async function ambilQuest(){
     const r = await fetch('/api/qa?k=' + QUEST.katalog, {cache:'no-store'}); const j = await r.json();
     const tanda = JSON.stringify([j.aktif, j.putaran, j.tc?.map(t => t.id + (t.kini||'') + JSON.stringify(t.s))]);
     QUEST.data = j;
+    if (typeof j.aktif === 'number') QUEST.katalog = j.aktif;
     if (tanda !== QUEST.tanda){ QUEST.tanda = tanda; bangunQuest(); }
     if (TAB === 'quest') gambarQuest();
   } catch (e) { /* server lama tanpa /api/qa: abaikan */ }
@@ -1186,10 +1310,13 @@ function gambarQuest(){
     (!cari || (t.id + ' ' + t.f + ' ' + t.k).toLowerCase().includes(cari)))
     .sort((a,b) => (statusTC(a)==='FAIL'?0:1) - (statusTC(b)==='FAIL'?0:1) || a.id.localeCompare(b.id));
   const MAKS = 250;
-  Q.innerHTML = `<div class="qkontrol">
-      ${d.katalog.length > 1 ? `<select id="qKat">${d.katalog.map((k,i) => `<option value="${i}"${i===d.aktif?' selected':''}>${esc(k)}</option>`).join('')}</select>` : `<div class="grp" style="margin:4px 2px">${esc(d.katalog[0])}</div>`}
+  const proyek = d.proyek || d.katalog.map(n => ({nama: n}));
+  const daftarProyek = `<div class="grp" style="margin:2px 2px 4px">Proyek</div><div class="qproyek">${proyek.map((p, i) =>
+    `<button class="qpr${i===d.aktif?' on':''}" data-k="${i}">${esc(p.nama)}<span>${p.total != null ? `${p.total} TC` : ''}${p.fail ? ` · <b style="color:#b8322a">${p.fail} FAIL</b>` : ''}</span></button>`).join('')}</div>`;
+  const kosong = !d.tc.length ? `<div style="font-size:12.5px;color:var(--teks3);padding:6px 2px">Belum ada test case untuk ${esc(proyek[d.aktif]?.nama || '')}.${proyek[d.aktif]?.ada === false ? ' Folder QA-nya belum dibuat.' : ' Taruh TestPlan_GRUP.md di folder QA proyek ini.'}</div>` : '';
+  Q.innerHTML = `${daftarProyek}<div class="qkontrol">
       <select id="qPut"><option value="kini"${st==='kini'?' selected':''}>Status terkini</option>${d.putaran.map(p => `<option value="${p}"${st===p?' selected':''}>Putaran ${p}</option>`).join('')}</select>
-    </div>${grupHtml}
+    </div>${kosong}${grupHtml}
     <div class="qchips">${chip('','Semua')}${chip('FAIL','FAIL')}${chip('JANGGAL','Janggal')}${chip('BLOCKED','Blocked')}${chip('TIDAK BISA DIUJI','TBD')}${chip('PASS','Pass')}${chip('-','Belum')}</div>
     <input id="qCari" placeholder="Cari ID / fitur / test case" value="${esc(QUEST.cari)}">
     <div class="grp">${xs.length} test case${xs.length > MAKS ? ` (tampil ${MAKS})` : ''}</div>
@@ -1197,6 +1324,9 @@ function gambarQuest(){
   if (fokus){ const c = $('qCari'); c.focus(); c.setSelectionRange(c.value.length, c.value.length); }
 }
 $('quest').addEventListener('click', e => {
+  const pr = e.target.closest('.qpr');
+  if (pr){ const k = +pr.dataset.k; if (k !== QUEST.katalog){ QUEST.katalog = k; try { localStorage.setItem('desaQuestProyek', String(k)); } catch (e2) {}
+    QUEST.tanda = ''; QUEST.filterG = ''; QUEST.filterS = ''; QUEST.pilih = null; QUEST.putaran = 'kini'; ambilQuest(); } return; }
   const g = e.target.closest('.qg'), c = e.target.closest('.qchip'), it = e.target.closest('.qt');
   if (g){ QUEST.filterG = QUEST.filterG === g.dataset.g ? '' : g.dataset.g; const p = QUEST.papan.find(x => x.nama === g.dataset.g);
     if (p && QUEST.filterG){ kam.fokus = null; kam.fokusPos = V(p.g.position.x, 0, p.g.position.z + 4); kam.zoomTuju = Math.max(kam.zoomTuju, 1.5); } gambarQuest(); }
@@ -1205,7 +1335,6 @@ $('quest').addEventListener('click', e => {
 });
 $('quest').addEventListener('change', e => {
   if (e.target.id === 'qPut'){ QUEST.putaran = e.target.value; bangunQuest(); gambarQuest(); }
-  if (e.target.id === 'qKat'){ QUEST.katalog = +e.target.value; QUEST.tanda = ''; QUEST.filterG = ''; ambilQuest(); }
 });
 $('quest').addEventListener('input', e => { if (e.target.id === 'qCari'){ QUEST.cari = e.target.value; gambarQuest(); } });
 function gantiTab(t){
@@ -1214,6 +1343,374 @@ function gantiTab(t){
   if (t === 'quest'){ gambarQuest(); if (!QUEST.pilih){ kam.fokus = null; kam.fokusPos = halamanQuest(0, -3); kam.zoomTuju = 1.05; } }
 }
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => gantiTab(b.dataset.tab));
+
+// ═════ CHAT MASTER ═════
+// Panel "Chat Master" (jendela mengambang, tombol Master di bar bawah): chat ke proses koordinator (claude -p) di server. Event dari /api/master?sejak=<id>:
+// kamu / master / kirim (ke = sesi tujuan) / masuk (dari = sesi pengirim) / alat / sistem / galat.
+// POST wajib header X-Token (disisipkan server ke halaman ini saat /desa dilayani).
+let TOKEN_MASTER = '__TOKEN_MASTER__';
+// token berganti tiap server menyala: kalau POST ditolak "token salah", ambil token baru dari /desa (same-origin) lalu ulang sekali
+async function segarkanToken(){
+  try { const m = (await (await fetch('/desa', {cache:'no-store'})).text()).match(/let TOKEN_MASTER = '([A-Za-z0-9_-]{16,})'/);
+    if (m){ TOKEN_MASTER = m[1]; return true; } } catch (e) {}
+  return false;
+}
+async function postToken(jalur, opsi){
+  const kirim = () => fetch(jalur, {...opsi, method:'POST', headers:{...opsi.headers, 'X-Token':TOKEN_MASTER}});
+  let r = await kirim();
+  if (r.status === 403){ const j = await r.clone().json().catch(() => ({})); if (/token/.test(j.error || '') && await segarkanToken()) r = await kirim(); }
+  return r;
+}
+const MCHAT = {ev:[], akhir:0, status:'', galat:'', dimuat:false, belum:false, timer:null, buka:false};
+const STATUS_M = {mati:'Master mati', siap:'Master siap', sibuk:'Master berpikir...'};
+const teksChat = s => esc(s).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
+const jamChat = w => new Date(w*1000).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+function barisChat(e){
+  const jam = `title="${jamChat(e.w)}"`;
+  if (e.j === 'kamu'){ const g = (e.gambar || []).map(n => `<a href="/api/master/lampiran/${encodeURIComponent(n)}" target="_blank" rel="noopener"><img src="/api/master/lampiran/${encodeURIComponent(n)}" alt="lampiran" loading="lazy"></a>`).join('');
+    return `<div class="mg mg-kamu" ${jam}>${e.ke ? `<span class="ke">ke ${esc(e.ke)}</span>` : ''}${teksChat(e.teks)}${g ? `<span class="gbr">${g}</span>` : ''}</div>`; }
+  if (e.j === 'master') return `<div class="mg mg-master" ${jam}>${teksChat(e.teks)}</div>`;
+  if (e.j === 'masuk') return `<div class="mg mg-masuk" ${jam}><span class="dari">dari ${esc(e.dari)}</span>${teksChat(e.teks)}</div>`;
+  if (e.j === 'kirim'){ const r = e.teks.split('\n')[0];
+    return `<details class="mk" ${jam}><summary>&rarr; <b>${esc(e.ke)}</b>: ${esc(r.length > 70 ? r.slice(0, 69) + '…' : r)}</summary><pre>${esc(e.teks)}</pre></details>`; }
+  return `<div class="mx${e.j === 'galat' ? ' galat' : ''}" ${jam}>${esc(e.teks)}</div>`;
+}
+function barisRiwayat(x){
+  const jam = x.w ? `title="${jamChat(x.w)}"` : '';
+  if (x.j === 'user') return `<div class="mg mg-kamu" ${jam}>${teksChat(x.teks)}</div>`;
+  if (x.j === 'claude') return `<div class="mg mg-master" ${jam}>${teksChat(x.teks)}</div>`;
+  if (x.j === 'masuk') return `<div class="mg mg-masuk" ${jam}><span class="dari">dari ${esc(x.dari)}</span>${teksChat(x.teks)}</div>`;
+  if (x.j === 'kirim'){ const ke = /^uds:/.test(x.ke) ? 'balasan ke pengirim' : x.ke, r = x.teks.split('\n')[0];
+    return `<details class="mk" ${jam}><summary>&rarr; <b>${esc(ke)}</b>: ${esc(r.length > 70 ? r.slice(0, 69) + '…' : r)}</summary><pre>${esc(x.teks)}</pre></details>`; }
+  if (x.j === 'alat') return `<div class="mx" ${jam}>alat: ${esc(x.nama.join(', '))}${x.n > 1 ? ` (${x.n}x)` : ''}</div>`;
+  return '';
+}
+function gambarTab(){
+  const ada = !!MCHAT.tujuan; $('mTab').classList.toggle('ada', ada);
+  if (!ada) MCHAT.lihat = 'master';
+  const [bm, br] = $('mTab').querySelectorAll('button');
+  bm.classList.toggle('on', MCHAT.lihat !== 'riwayat'); br.classList.toggle('on', MCHAT.lihat === 'riwayat');
+  bm.classList.toggle('baru', !!MCHAT.belumTab && MCHAT.lihat === 'riwayat');
+  br.textContent = 'Riwayat ' + (MCHAT.tujuan || ''); br.title = `Percakapan sesi ${MCHAT.tujuan || ''} (baca saja)`;
+}
+function gambarChat(gulir){
+  const log = $('mLog'), bawah = gulir || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  gambarTab();
+  if (MCHAT.lihat === 'riwayat' && MCHAT.tujuan){
+    const r = MCHAT.riw;
+    $('mDot').className = 'dot d-' + (r && r.status === 'sibuk' ? 'sibuk' : 'siap');
+    $('mStatus').textContent = `${MCHAT.tujuan} ${r ? (r.status === 'sibuk' ? 'sedang kerja' : 'siap') : '...'}`;
+    log.innerHTML = !r || r.nama !== MCHAT.tujuan ? '<div class="mkosong">memuat riwayat...</div>'
+      : `<div class="mriwket">${r.item.length} pesan terakhir sesi ${esc(r.nama)} · baca saja · kirim tetap lewat Master</div>`
+        + (r.item.length ? r.item.map(barisRiwayat).join('') : `<div class="mkosong">${esc(r.pesan || 'Belum ada percakapan.')}</div>`);
+    if (bawah) log.scrollTop = log.scrollHeight;
+    return;
+  }
+  $('mDot').className = 'dot d-' + (MCHAT.status || 'mati');
+  $('mStatus').textContent = MCHAT.dimuat ? (STATUS_M[MCHAT.status] || MCHAT.status) : 'Server belum mendukung Chat Master';
+  $('mStatus').title = MCHAT.galat || (MCHAT.status === 'mati' ? 'Menyala otomatis saat kamu mengirim pesan' : '');
+  log.innerHTML = MCHAT.ev.length ? MCHAT.ev.map(barisChat).join('') : `<div class="mkosong">Master adalah koordinator: ia melihat sesi Claude yang aktif, meneruskan tugasmu ke sesi yang cocok, menunggu balasannya, lalu merangkum di sini.<br><br>Contoh: <i>sesi apa saja yang aktif?</i><br><br>Tindakan berisiko (upload, publish, hapus, push) tetap kamu konfirmasi langsung di sesi tujuan.</div>`;
+  if (bawah) log.scrollTop = log.scrollHeight;
+}
+function tandaBelum(){ $('bMaster').classList.toggle('baru', MCHAT.belum); }
+async function ambilChat(){
+  clearTimeout(MCHAT.timer);
+  if (MCHAT.sedang){ MCHAT.ulang = true; return; }  // satu permintaan saja; panggilan susulan diulang sesudahnya
+  MCHAT.sedang = true;
+  try {
+    const r = await fetch('/api/master?sejak=' + MCHAT.akhir, {cache:'no-store'});
+    if (r.ok){ const j = await r.json();
+      if (j.akhir < MCHAT.akhir){ MCHAT.ev = []; MCHAT.akhir = 0; }  // riwayat server direset: muat ulang dari awal
+      const baru = (j.ev || []).filter(e => e.id > MCHAT.akhir), berubah = baru.length || j.status !== MCHAT.status || j.galat !== MCHAT.galat || !MCHAT.dimuat;
+      if (MCHAT.dimuat) for (const e of baru){
+        if (e.j === 'kirim') terbangkanKurir(e.ke);
+        if (!MCHAT.buka && (e.j === 'master' || e.j === 'masuk')) MCHAT.belum = true;
+        if (MCHAT.lihat === 'riwayat' && (e.j === 'master' || e.j === 'masuk')) MCHAT.belumTab = true;
+      }
+      MCHAT.ev = MCHAT.ev.concat(baru).slice(-400); if (baru.length) MCHAT.akhir = baru[baru.length - 1].id;
+      MCHAT.status = j.status; MCHAT.galat = j.galat || ''; MCHAT.dimuat = true;
+      tandaBelum(); if (berubah && MCHAT.buka) gambarChat(false);
+    }
+  } catch (e) { /* server mati / lama: coba lagi nanti */ }
+  MCHAT.sedang = false;
+  if (MCHAT.ulang){ MCHAT.ulang = false; ambilChat(); return; }
+  MCHAT.timer = setTimeout(ambilChat, MCHAT.buka ? 1500 : 5000);
+}
+async function postMaster(jalur, isi){
+  const r = await postToken(jalur, {headers:{'Content-Type':'application/json'}, body:JSON.stringify(isi || {})});
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.galat || j.error || ('HTTP ' + r.status));
+  return j;
+}
+function galatForm(pesan){ const g = $('mGalat'); g.textContent = pesan || ''; g.classList.toggle('ada', !!pesan); }
+$('mTeks').addEventListener('input', () => galatForm(''));
+function galatChat(pesan){ if (/^Gagal mengirim/.test(pesan)) galatForm(pesan + ' - teksmu dikembalikan ke kotak ketik, belum terkirim.'); MCHAT.lihat = 'master'; MCHAT.ev.push({id:MCHAT.akhir, w:Date.now()/1000, j:'galat', teks:pesan}); gambarChat(true); }
+// lampiran gambar: Ctrl+V di kotak ketik -> pratinjau (bisa dibatalkan) -> saat kirim diunggah ke /api/master/lampiran,
+// lalu nama filenya ikut di /api/master/kirim. Server menyisipkan jalur absolutnya ke pesan untuk Master.
+const LAMP_MAKS = 4, LAMP_BYTE = 8 * 1024 * 1024, LAMP_TIPE = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+MCHAT.lamp = [];  // {blob, url}
+function gambarLamp(){
+  const el = $('mLamp'); el.classList.toggle('ada', MCHAT.lamp.length > 0);
+  el.innerHTML = MCHAT.lamp.map((l, i) => `<span class="mli"><img src="${l.url}" alt="pratinjau"><button type="button" data-i="${i}" title="Batalkan gambar ini" aria-label="Batalkan gambar">&times;</button></span>`).join('')
+    + (MCHAT.lamp.length ? `<span class="mlket">${MCHAT.lamp.length} gambar ikut terkirim</span>` : '');
+}
+function buangLamp(i){ const l = MCHAT.lamp.splice(i, 1)[0]; gambarLamp(); if (l) URL.revokeObjectURL(l.url); }
+$('mLamp').addEventListener('click', e => { const b = e.target.closest('button[data-i]'); if (b) buangLamp(+b.dataset.i); });
+$('mTeks').addEventListener('paste', e => {
+  const cd = e.clipboardData; if (!cd) return;
+  const gbr = [...cd.items].filter(it => it.kind === 'file' && LAMP_TIPE.includes(it.type)).map(it => it.getAsFile()).filter(Boolean);
+  if (!gbr.length) return;  // tempel teks biasa
+  if (!cd.getData('text/plain')) e.preventDefault();  // tangkapan layar: jangan tempel nama file
+  for (const f of gbr){
+    if (MCHAT.lamp.length >= LAMP_MAKS){ galatChat(`Maksimal ${LAMP_MAKS} gambar per pesan.`); break; }
+    if (f.size > LAMP_BYTE){ galatChat('Gambar lebih dari 8 MB, tidak dilampirkan.'); continue; }
+    MCHAT.lamp.push({blob: f, url: URL.createObjectURL(f)});
+  }
+  gambarLamp();
+});
+async function unggahLamp(l){
+  const r = await postToken('/api/master/lampiran', {headers:{'Content-Type': l.blob.type || 'application/octet-stream'}, body:l.blob});
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 413) throw new Error(/maks 19 KB/.test(j.error || '')
+    ? 'server desa masih versi lama tanpa fitur gambar - restart server lalu muat ulang halaman'
+    : `gambar ${(l.blob.size / 1048576).toFixed(1)} MB terlalu besar (maks 8 MB)`);
+  if (r.status === 403) throw new Error((j.error || 'ditolak') + ' (server sempat direstart? muat ulang halaman desa)');
+  if (r.status === 404) throw new Error('server desa belum mendukung lampiran gambar - restart server lalu muat ulang halaman');
+  if (!r.ok || !j.nama) throw new Error(j.error || ('HTTP ' + r.status));
+  return j.nama;
+}
+$('mForm').addEventListener('submit', async e => {
+  e.preventDefault(); const ta = $('mTeks'), teks = ta.value.trim(), lamp = MCHAT.lamp.slice();
+  if ((!teks && !lamp.length) || MCHAT.mengirim) return;
+  MCHAT.mengirim = true; $('mKirim').disabled = true; ta.value = ''; galatForm(''); MCHAT.status = 'sibuk'; gambarChat(true);
+  try {
+    const lampiran = [];
+    for (const l of lamp) lampiran.push(await unggahLamp(l));
+    await postMaster('/api/master/kirim', {teks, lampiran, tujuan: MCHAT.tujuan || ''});
+    if (MCHAT.lihat === 'riwayat'){ MCHAT.lihat = 'master'; MCHAT.belumTab = false; gambarChat(true); }
+    MCHAT.lamp = MCHAT.lamp.filter(l => !lamp.includes(l)); gambarLamp();
+    for (const l of lamp) URL.revokeObjectURL(l.url);
+  } catch (er) { if (!ta.value) ta.value = teks; galatChat('Gagal mengirim: ' + er.message); }
+  MCHAT.mengirim = false; $('mKirim').disabled = false;
+  ambilChat();
+});
+$('mTeks').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('mForm').requestSubmit(); } });
+$('mUlang').onclick = async () => { if (!confirm('Hentikan proses Master? Kiriman berikutnya melanjutkan percakapan yang sama.')) return;
+  try { await postMaster('/api/master/ulang'); } catch (er) { galatChat('Gagal: ' + er.message); } ambilChat(); };
+$('mBaru').onclick = async () => { if (!confirm('Mulai percakapan baru? Master melupakan konteks percakapan lama (riwayat di panel tetap ada).')) return;
+  try { await postMaster('/api/master/baru'); } catch (er) { galatChat('Gagal: ' + er.message); } ambilChat(); };
+
+// sesi tujuan: chip dari /api/master/sesi (registry sesi Claude Code, nama = nama di ListAgents). Klik = pesan berikutnya
+// diawali "[Tujuan: X]" sehingga Master langsung meneruskan ke X. Pilihan menetap sampai dibatalkan / diklik lagi.
+MCHAT.sesi = []; MCHAT.tujuan = '';
+function gambarSesi(){
+  const el = $('mSesi');
+  if (MCHAT.tujuan && !MCHAT.sesi.some(x => x.nama === MCHAT.tujuan)) MCHAT.tujuan = '';  // sesi tujuan sudah tutup
+  el.innerHTML = `<span class="lbl2">${MCHAT.tujuan ? 'Ke:' : 'Tujuan:'}</span>` + (MCHAT.sesi.length
+    ? MCHAT.sesi.map(x => `<button type="button" class="msc${x.nama === MCHAT.tujuan ? ' on' : ''}" data-nama="${esc(x.nama)}" title="${x.status === 'sibuk' ? 'Sedang kerja' : 'Siap'} - klik untuk ${x.nama === MCHAT.tujuan ? 'membatalkan' : 'mengirim pesan berikutnya ke sesi ini'}"><i class="${x.status}"></i>${esc(x.nama)}</button>`).join('')
+    : '<span class="lbl2">tidak ada sesi lain yang aktif</span>')
+    + (MCHAT.tujuan ? `<button type="button" class="batal" title="Biarkan Master yang memilih tujuan">&times; batal</button>` : '');
+  $('mTeks').placeholder = MCHAT.tujuan ? `Pesan untuk ${MCHAT.tujuan} (lewat Master)...` : 'Tulis ke Master... (Enter kirim, Shift+Enter baris baru, Ctrl+V tempel gambar)';
+}
+async function ambilSesi(){
+  try { const r = await fetch('/api/master/sesi', {cache:'no-store'}); if (r.ok){ MCHAT.sesi = (await r.json()).sesi || []; gambarSesi(); } } catch (e) {}
+}
+MCHAT.lihat = 'master'; MCHAT.riw = null;
+async function ambilRiwayat(){
+  const nama = MCHAT.tujuan; if (!nama) return;
+  try { const r = await fetch('/api/master/riwayat?nama=' + encodeURIComponent(nama), {cache:'no-store'}); const j = await r.json();
+    if (nama !== MCHAT.tujuan) return;
+    const lama = JSON.stringify(MCHAT.riw); MCHAT.riw = r.ok ? j : {nama, status:'siap', item:[], pesan: j.error || 'Riwayat tidak bisa dibaca.'};
+    if (JSON.stringify(MCHAT.riw) !== lama){ if (MCHAT.lihat === 'riwayat') gambarChat(false); gambarSaran(); }
+  } catch (e) {}
+}
+setInterval(() => { if (MCHAT.buka && MCHAT.tujuan) ambilRiwayat(); }, 4000);
+
+// saran pesan berikutnya (gratis, tanpa model): aturan sederhana dari jawaban terakhir sesi tujuan.
+// Klik saran = mengisi kotak ketik (tidak langsung terkirim).
+function saranDari(r){
+  if (!r || !r.item || !r.item.length) return [];
+  const it = r.item, akhir = it[it.length - 1];
+  const out = [], tambah = (...xs) => { for (const x of xs) if (x && !out.includes(x) && out.length < 4) out.push(x); };
+  if (r.status === 'sibuk' || (akhir && akhir.j !== 'claude')) tambah('status sekarang?', 'ringkas yang sudah selesai');
+  const c = [...it].reverse().find(x => x.j === 'claude'); if (!c){ tambah('lanjut'); return out; }
+  const t = c.teks, tl = t.toLowerCase(), ekor = tl.slice(-700);
+  const opsi = [...new Set([...t.matchAll(/(?:^|\n)\s*(?:\*\*)?(?:opsi\s+)?\(?([A-D])[.)](?:\*\*)?\s/gi)].map(m => m[1].toUpperCase()))];
+  if (opsi.length >= 2) tambah(...opsi.slice(0, 3).map(o => 'pilih ' + o));
+  if (/\brestart\b/.test(ekor)) tambah('restart');
+  if (/\bcommit\b/.test(ekor)) tambah('commit', 'jangan commit dulu');
+  if (/\bpush\b/.test(ekor)) tambah('push');
+  if (/\bupload\b/.test(ekor)) tambah('upload');
+  if (/\?\s*$/.test(t.trim()) || /\b(mau (aku|saya)|kalau mau|bilang|boleh|apakah|setuju)\b/.test(ekor)) tambah('ya, gas', 'jangan dulu');
+  if (/\b(error|galat|gagal)\b/.test(ekor)) tambah('coba perbaiki errornya');
+  tambah('lanjut', 'tes hasilnya', 'ringkas hasil terakhir');
+  return out;
+}
+function gambarSaran(){
+  const el = $('mSaran'), xs = MCHAT.tujuan && MCHAT.riw && MCHAT.riw.nama === MCHAT.tujuan ? saranDari(MCHAT.riw) : [];
+  el.classList.toggle('ada', xs.length > 0);
+  el.innerHTML = xs.length ? '<span class="lbl2">Saran:</span>' + xs.map(x => `<button type="button" class="msr" title="Isi kotak ketik">${esc(x)}</button>`).join('') : '';
+}
+// ═════ PERLU JAWABAN ═════
+// /api/master/perlu tiap 8 dtk: sesi yg bertanya / mungkin menunggu izin. Klik item = buka Chat Master, pilih sesi itu
+// sebagai tujuan, lihat riwayat + saran. x = sembunyikan item itu (sampai ada pertanyaan baru). Tidak ada tombol
+// "setujui": izin alat tetap diberikan user langsung di sesinya.
+const PERLU = {item: [], tutup: new Set(), ciut: false, judul: document.title};
+try { PERLU.tutup = new Set(JSON.parse(localStorage.getItem('desaPerluTutup') || '[]')); PERLU.ciut = localStorage.getItem('desaPerluCiut') === '1'; } catch (e) {}
+const kunciPerlu = x => x.nama + '|' + (x.w || 0) + '|' + x.jenis;
+function gambarPerlu(){
+  const xs = PERLU.item.filter(x => !PERLU.tutup.has(kunciPerlu(x))), el = $('perlu');
+  el.classList.toggle('ada', xs.length > 0); el.classList.toggle('ciut', PERLU.ciut);
+  document.title = xs.length ? `(${xs.length}) ${PERLU.judul}` : PERLU.judul;
+  if (!xs.length) return;
+  el.querySelector('.jml').textContent = xs.length;
+  el.querySelector('.pdaf').innerHTML = xs.map(x => `<div class="pit" data-nama="${esc(x.nama)}" title="Buka sesi ${esc(x.nama)} di Chat Master">
+    <span class="jn jn-${x.jenis}">${x.jenis === 'izin' ? 'izin?' : 'tanya'}</span>
+    <span class="isi"><b>${esc(x.nama)}</b> <span class="w">${x.w ? jamChat(x.w) : ''}</span><span class="q">${esc(x.teks)}</span></span>
+    <button class="x" data-k="${esc(kunciPerlu(x))}" title="Sembunyikan sampai ada pertanyaan baru" aria-label="Sembunyikan">&times;</button></div>`).join('');
+}
+async function ambilPerlu(){
+  try { const r = await fetch('/api/master/perlu', {cache:'no-store'}); if (r.ok){ PERLU.item = (await r.json()).item || [];
+    const ada = new Set(PERLU.item.map(kunciPerlu)); PERLU.tutup = new Set([...PERLU.tutup].filter(k => ada.has(k)));  // buang kunci basi
+    gambarPerlu(); } } catch (e) {}
+}
+$('perlu').addEventListener('click', async e => {
+  const x = e.target.closest('.x');
+  if (x){ PERLU.tutup.add(x.dataset.k); try { localStorage.setItem('desaPerluTutup', JSON.stringify([...PERLU.tutup])); } catch (e2) {} gambarPerlu(); return; }
+  if (e.target.closest('.pkep')){ PERLU.ciut = !PERLU.ciut; try { localStorage.setItem('desaPerluCiut', PERLU.ciut ? '1' : ''); } catch (e2) {} gambarPerlu(); return; }
+  const it = e.target.closest('.pit'); if (!it) return;
+  if (!MCHAT.buka) bukaChat(true);
+  if (!MCHAT.sesi.some(s => s.nama === it.dataset.nama)) await ambilSesi();
+  MCHAT.tujuan = it.dataset.nama; MCHAT.lihat = 'riwayat'; MCHAT.riw = null;
+  gambarSesi(); gambarChat(true); gambarSaran(); ambilRiwayat();
+});
+setInterval(ambilPerlu, 8000);
+
+$('mSaran').addEventListener('click', e => { const b = e.target.closest('.msr'); if (!b) return;
+  const ta = $('mTeks'); ta.value = ta.value.trim() ? ta.value.replace(/\s*$/, ' ') + b.textContent : b.textContent; ta.focus(); });
+$('mTab').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return;
+  MCHAT.lihat = b.dataset.v; if (MCHAT.lihat === 'master') MCHAT.belumTab = false; else ambilRiwayat(); gambarChat(true); });
+$('mSesi').addEventListener('click', e => {
+  if (e.target.closest('.batal')){ MCHAT.tujuan = ''; MCHAT.lihat = 'master'; gambarSesi(); gambarChat(true); gambarSaran(); return; }
+  const b = e.target.closest('.msc'); if (!b) return;
+  MCHAT.tujuan = MCHAT.tujuan === b.dataset.nama ? '' : b.dataset.nama;
+  MCHAT.lihat = MCHAT.tujuan ? 'riwayat' : 'master'; MCHAT.riw = null;  // pilih sesi = langsung lihat riwayatnya
+  gambarSesi(); gambarChat(true); gambarSaran(); ambilRiwayat(); $('mTeks').focus();
+});
+setInterval(() => { if (MCHAT.buka) ambilSesi(); }, 10000);
+
+// jendela Chat Master: buka/tutup (tombol Master, X), seret lewat judul, ubah ukuran (CSS resize); posisi diingat per browser
+const SIMPAN_M = 'desaMaster', panelM = $('master');
+let geoM = null;  // posisi/ukuran terakhir saat TERBUKA (panel tertutup = display:none, ukurannya 0)
+const simpanPanelM = () => { try {
+  // offset* = ukuran tanpa transform (animasi muncul memakai scale, getBoundingClientRect ikut mengecil)
+  if (MCHAT.buka && panelM.style.left && panelM.offsetWidth > 0 && innerWidth >= 200) geoM = {x: panelM.offsetLeft, y: panelM.offsetTop, w: panelM.offsetWidth, h: panelM.offsetHeight};
+  localStorage.setItem(SIMPAN_M, JSON.stringify({buka: MCHAT.buka, ...(geoM || {})})); } catch (e) {} };
+function jepitPanelM(){  // jaga jendela tetap di dalam layar (judul selalu bisa diraih)
+  if (!MCHAT.buka || !panelM.style.left || innerWidth < 200) return;  // panel tertutup / viewport belum siap: tak terukur
+  panelM.style.left = Math.max(4, Math.min(innerWidth - 80, panelM.offsetLeft)) + 'px'; panelM.style.top = Math.max(4, Math.min(innerHeight - 40, panelM.offsetTop)) + 'px';
+}
+function lepasJangkarM(){  // dari jangkar kanan-bawah ke left/top, supaya seret & resize bergerak wajar
+  if (panelM.style.left || !panelM.offsetWidth || innerWidth < 200) return;
+  Object.assign(panelM.style, {left: panelM.offsetLeft + 'px', top: panelM.offsetTop + 'px', width: panelM.offsetWidth + 'px', height: panelM.offsetHeight + 'px', right: 'auto', bottom: 'auto'});
+}
+function bukaChat(buka){
+  MCHAT.buka = buka; panelM.classList.toggle('buka', buka); $('bMaster').classList.toggle('on', buka);
+  if (buka){ lepasJangkarM(); MCHAT.belum = false; tandaBelum(); gambarChat(true); ambilChat(); ambilSesi(); jepitPanelM(); if (matchMedia('(min-width:821px)').matches) $('mTeks').focus(); }
+  simpanPanelM();
+}
+$('bMaster').onclick = () => bukaChat(!MCHAT.buka);
+$('mTutup').onclick = () => bukaChat(false);
+{ let seretM = null;
+  $('mJudul').addEventListener('pointerdown', e => { if (e.target.closest('button') || !matchMedia('(min-width:821px)').matches) return;
+    lepasJangkarM(); seretM = {dx: e.clientX - panelM.offsetLeft, dy: e.clientY - panelM.offsetTop}; $('mJudul').setPointerCapture(e.pointerId); });
+  $('mJudul').addEventListener('pointermove', e => { if (!seretM) return;
+    panelM.style.left = (e.clientX - seretM.dx) + 'px'; panelM.style.top = (e.clientY - seretM.dy) + 'px'; jepitPanelM(); });
+  $('mJudul').addEventListener('pointerup', () => { if (seretM){ seretM = null; simpanPanelM(); } });
+  // ukuran (CSS resize di sudut kanan bawah) disimpan sesudah berubah
+  // ubah ukuran lewat pegangan .mrz (arah: w / e / s / sw / se), dijepit ke ukuran min CSS dan ke layar
+  let ukurM = null;
+  panelM.addEventListener('pointerdown', e => { const h = e.target.closest('.mrz'); if (!h) return;
+    e.preventDefault(); lepasJangkarM();
+    ukurM = {a: h.dataset.a, x: e.clientX, y: e.clientY, l: panelM.offsetLeft, t: panelM.offsetTop, w: panelM.offsetWidth, h: panelM.offsetHeight};
+    h.setPointerCapture(e.pointerId); document.body.classList.add('ukurPanel'); getSelection()?.removeAllRanges(); });
+  panelM.addEventListener('pointermove', e => { if (!ukurM) return; const u = ukurM, dx = e.clientX - u.x, dy = e.clientY - u.y;
+    const MINW = 280, MINH = 260;
+    if (u.a.includes('e')) panelM.style.width = Math.max(MINW, Math.min(innerWidth - u.l - 4, u.w + dx)) + 'px';
+    if (u.a.includes('s')) panelM.style.height = Math.max(MINH, Math.min(innerHeight - u.t - 4, u.h + dy)) + 'px';
+    if (u.a.includes('w')){ const w = Math.max(MINW, Math.min(u.l + u.w - 4, u.w - dx)); panelM.style.width = w + 'px'; panelM.style.left = (u.l + u.w - w) + 'px'; } });
+  panelM.addEventListener('pointerup', () => { if (ukurM){ ukurM = null; document.body.classList.remove('ukurPanel'); simpanPanelM(); } });
+  let tUkur = 0; new ResizeObserver(() => { if (!MCHAT.buka) return; clearTimeout(tUkur); tUkur = setTimeout(simpanPanelM, 300); }).observe(panelM);
+  addEventListener('resize', jepitPanelM);
+}
+try { const m = JSON.parse(localStorage.getItem(SIMPAN_M) || '{}');
+  if (m.x != null && m.w > 0){ geoM = {x: m.x, y: m.y, w: m.w, h: m.h}; Object.assign(panelM.style, {left: m.x + 'px', top: m.y + 'px', width: m.w + 'px', height: m.h + 'px', right: 'auto', bottom: 'auto'}); }
+  if (m.buka) bukaChat(true); } catch (e) {}
+
+// kurir: gulungan surat bersinar terbang lengkung dari Aula Guild ke sesi (Lead) tujuan tiap kali Master mengirim pesan
+const KURIR = [], geoKurir = new THREE.CylinderGeometry(0.16, 0.16, 0.7, 10), matKurir = emisif(0xffe7a0, 2.4), matTali = emisif(0xd8403a, 1.4);
+function terbangkanKurir(ke){
+  const nama = String(ke || '').trim().toLowerCase(); if (!nama) return;
+  const o = [...AGEN.values()].find(x => x.data && x.data.peran === 'Lead' && [x.data.judul_sesi, x.data.deskripsi].some(n => (n || '').trim().toLowerCase() === nama));
+  if (!o) return;  // sesi tujuan tidak ada di peta
+  const g = new THREE.Group(), gul = new THREE.Mesh(geoKurir, matKurir), tali = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.035, 6, 14), matTali);
+  gul.rotation.z = Math.PI/2; tali.rotation.y = Math.PI/2; g.add(gul, tali);
+  g.traverse(m => { m.userData.dinamis = true; }); g.scale.setScalar(0.01); scene.add(g);
+  KURIR.push({g, tali, o, t:0, dari:V(AREA.Aula.x, 3.2, AREA.Aula.z)});
+}
+HIDUP.push((t, dt) => {
+  for (let i = KURIR.length - 1; i >= 0; i--){
+    const k = KURIR[i]; k.t += dt / 2.5;
+    const tuju = k.o.s.g.position, u = Math.min(1, k.t), e = u < 0.5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
+    const ke = V(tuju.x, tuju.y + 3.6, tuju.z), tinggi = 5 + k.dari.distanceTo(ke) * 0.18;
+    k.g.position.lerpVectors(k.dari, ke, e); k.g.position.y += Math.sin(e * Math.PI) * tinggi;
+    k.g.rotation.set(Math.sin(t*6)*0.25, t*3, Math.sin(t*4)*0.2);
+    const skala = k.t < 0.1 ? k.t/0.1 : k.t > 1 ? Math.max(0, 1 - (k.t - 1)/0.12) : 1;
+    k.g.scale.setScalar(Math.max(0.01, skala));
+    if (k.t > 1.12 || !AGEN.has(k.o.id)){ scene.remove(k.g); k.tali.geometry.dispose(); KURIR.splice(i, 1); }
+  }
+});
+
+// ═════ PEMAKAIAN PLAN ═════
+// /api/pakai = cache pemakaian plan Claude Code (batas sesi 5 jam, mingguan, per model, kredit ekstra), tiap 30 dtk.
+// Strip ringkas di kepala panel kiri (batas sesi + mingguan semua model); klik = panel rincian.
+const PAKAI = {d:null, buka:false};
+const warnaPakai = (p, parah) => parah === 'critical' || p >= 90 ? '#d8403a' : parah === 'warning' || p >= 75 ? '#e8a83a' : '#3fae5a';
+const barPakai = (p, parah) => `<span class="pkbar"><i style="width:${Math.max(0, Math.min(100, p))}%;background:${warnaPakai(p, parah)}"></i></span>`;
+function lamaTeks(d){
+  d = Math.max(0, Math.round(d)); const h = Math.floor(d/86400), j = Math.floor(d%86400/3600), m = Math.floor(d%3600/60);
+  return h ? `${h} hr ${j} j` : j ? `${j} j ${m} m` : `${m} m`;
+}
+const jamReset = t => new Date(t*1000).toLocaleString('id-ID', {weekday:'short', hour:'2-digit', minute:'2-digit'});
+function gambarPakai(){
+  const d = PAKAI.d, el = $('pakai');
+  if (!d || !d.ada){ el.style.display = 'none'; if (PAKAI.buka) gambarRinciPakai(); return; }
+  const utama = [d.batas.find(b => b.jenis === 'session' || b.grup === 'session'), d.batas.find(b => b.jenis === 'weekly_all') || d.batas.find(b => b.grup === 'weekly')].filter(Boolean);
+  el.style.display = 'block'; el.classList.toggle('on', PAKAI.buka);
+  const umur = Date.now()/1000 - d.diambil;  // cache diperbarui Claude Code sendiri, bisa tertinggal
+  el.innerHTML = utama.map(b => `<span class="pkb"><span>${b.grup === 'session' ? 'Sesi 5 jam' : 'Mingguan'}</span>${barPakai(b.persen, b.parah)}<b>${Math.round(b.persen)}%</b></span>`).join('')
+    + (umur > 600 ? `<span class="pkb" style="display:block;color:${umur > 1800 ? '#a83228' : 'var(--teks3)'}">data ${lamaTeks(umur)} lalu${umur > 1800 ? ' - mungkin basi' : ''}</span>` : '');
+  if (PAKAI.buka) gambarRinciPakai();
+}
+function gambarRinciPakai(){
+  const d = PAKAI.d, box = $('pakaiRinci'); box.style.display = PAKAI.buka ? 'block' : 'none'; if (!PAKAI.buka) return;
+  if (!d || !d.ada){ $('pakaiIsi').innerHTML = `<h2>Pemakaian Claude</h2><div class="pkket">${esc(d?.pesan || 'Server belum mendukung data pemakaian.')}</div>`; return; }
+  const umur = Date.now()/1000 - d.diambil, basi = umur > 1800;
+  const baris = d.batas.map(b => `<div class="pkr"><div class="atas"><span>${esc(b.label)}</span><b>${Math.round(b.persen)}%</b></div>${barPakai(b.persen, b.parah)}
+    <div class="bawah">${b.reset ? `reset ${lamaTeks(b.reset - Date.now()/1000)} lagi · ${esc(jamReset(b.reset))}` : ''}${b.aktif ? ' · batas yang berlaku sekarang' : ''}</div></div>`).join('');
+  const e = d.ekstra, uang = x => x == null ? '-' : x.toLocaleString('id-ID', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const ekstra = e ? `<div class="pkr"><div class="atas"><span>Kredit ekstra</span><b>${e.nyala ? 'nyala' : 'mati'}</b></div>
+    <div class="bawah">${esc(e.mata_uang)} ${uang(e.terpakai)} dari ${uang(e.batas)} terpakai${!e.nyala && e.alasan ? ` · ${esc(e.alasan)}` : ''}</div></div>` : '';
+  const rinci = (d.rincian || []).filter(r => r.persen > 0);
+  $('pakaiIsi').innerHTML = `<h2>Pemakaian Claude</h2>${baris}${ekstra}
+    ${rinci.length ? `<div class="pkket">Pemakaian mingguan dari: ${rinci.map(r => `${esc(r.nama)} ${Math.round(r.persen)}%`).join(' · ')}</div>` : ''}
+    <div class="pkket"${basi ? ' style="color:#a83228"' : ''}>${d.sumber ? `Sesi 5 jam &amp; mingguan langsung dari Claude Code (${d.sumber === 'master' ? 'giliran Chat Master' : 'cek otomatis tiap 5 menit selama desa terbuka'}); batas lain dari cache` : 'Data dari cache Claude Code'}, diperbarui ${umur < 90 ? 'baru saja' : lamaTeks(umur) + ' lalu'}${basi ? ' (mungkin basi)' : ''}.</div>`;
+}
+async function ambilPakai(){
+  try { const r = await fetch('/api/pakai', {cache:'no-store'}); if (r.ok){ PAKAI.d = await r.json(); gambarPakai(); } } catch (e) { /* server lama: sembunyikan */ }
+}
+$('pakai').onclick = () => { PAKAI.buka = !PAKAI.buka; gambarPakai(); gambarRinciPakai(); };
+$('pakaiRinci').querySelector('.tutup').onclick = () => { PAKAI.buka = false; gambarPakai(); gambarRinciPakai(); };
 
 // ── detail TC (panel kanan) ──
 async function pilihTC(id, terbang = true){
@@ -1638,20 +2135,27 @@ async function ambil(){
 }
 
 // ═════ UI: daftar & detail ═════
+// grup "Arsip 24 jam" di daftar agen bisa dilipat; pilihan diingat per browser
+let arsipSembunyi = false;
+try { arsipSembunyi = localStorage.getItem('desaArsip') === 'sembunyi'; } catch (e) {}
 function gambarDaftar(){
   const now = Date.now()/1000 + selisih, xs = semuaAgen();
   const grp = {jalan:[], menunggu:[], diam:[], baru:[], arsip:[]};
-  for (const a of xs){ if (a.status==='jalan') grp.jalan.push(a); else if (a.status==='menunggu') grp.menunggu.push(a); else if (a.status==='diam') grp.diam.push(a); else if (now-a.akhir < SIMPAN_MENIT*60) grp.baru.push(a); else grp.arsip.push(a); }
+  const pin = xs.find(a => a.master === 'aktif');  // Chat Master yg dipakai panel: selalu paling atas, apa pun statusnya
+  for (const a of xs){ if (a === pin) continue; if (a.status==='jalan') grp.jalan.push(a); else if (a.status==='menunggu') grp.menunggu.push(a); else if (a.status==='diam') grp.diam.push(a); else if (now-a.akhir < SIMPAN_MENIT*60) grp.baru.push(a); else grp.arsip.push(a); }
   const item = (a, arsip) => { const lama = a.status==='jalan' ? now-a.mulai : a.durasi;
     return `<div class="item${a.id===pilihId?' pilih':''}${arsip?' arsip':''}" data-id="${esc(a.id)}"><span class="dot d-${a.status}"></span>${pil(a.peran)}<span class="nm">${esc(a.deskripsi)}</span><span class="wkt">${dur(lama)}</span></div>`; };
   // peringatan sumber data di atas daftar (bedakan dari "memang tak ada agen")
   const awas = DATA.peringatan ? `<div style="margin:8px 4px;padding:8px 10px;border-radius:8px;background:rgba(240,181,74,.28);color:#7a4a08;border:1px solid rgba(168,118,30,.5);font-size:12.5px">${esc(DATA.peringatan)}</div>` : '';
-  $('daftar').innerHTML = awas +
+  const ST_TEKS = {jalan:'sedang kerja', menunggu:'menunggu', diam:'diam', selesai:'selesai'};
+  const itemPin = a => item(a).replace('class="item', 'class="item pin').replace('<span class="wkt">', `<span class="stTeks">${ST_TEKS[a.status] || a.status}</span><span class="wkt">`);
+  $('daftar').innerHTML = awas + (pin ? `<div class="grp">Chat Master</div>` + itemPin(pin) : '') +
     (grp.jalan.length ? `<div class="grp">Sedang kerja (${grp.jalan.length})</div>`+grp.jalan.map(a=>item(a)).join('') : '<div class="grp">Sedang kerja (0)</div><div style="font-size:12.5px;color:var(--teks3);padding:2px 8px">Tidak ada agen yang kerja. Coba tombol Demo.</div>') +
     (grp.menunggu.length ? `<div class="grp">Menunggu balasanmu (${grp.menunggu.length})</div>`+grp.menunggu.map(a=>item(a)).join('') : '') +
     (grp.diam.length ? `<div class="grp">Tertidur / diam (${grp.diam.length})</div>`+grp.diam.map(a=>item(a)).join('') : '') +
     (grp.baru.length ? `<div class="grp">Baru selesai - di kedai (${grp.baru.length})</div>`+grp.baru.map(a=>item(a)).join('') : '') +
-    (grp.arsip.length ? `<div class="grp">Arsip 24 jam (${grp.arsip.length})</div>`+grp.arsip.map(a=>item(a,true)).join('') : '');
+    (grp.arsip.length ? `<div class="grp grpLipat" data-lipat="arsip" title="${arsipSembunyi ? 'Tampilkan' : 'Sembunyikan'} arsip">${arsipSembunyi ? '&#9656;' : '&#9662;'} Arsip 24 jam (${grp.arsip.length})<span class="mbtn">${arsipSembunyi ? 'Tampilkan' : 'Sembunyikan'}</span></div>`
+      + (arsipSembunyi ? '' : grp.arsip.map(a=>item(a,true)).join('')) : '');
   $('ringkas').textContent = `${grp.jalan.length} kerja · ${grp.menunggu.length} menunggu · ${grp.diam.length} diam · ${grp.baru.length} di kedai · ${grp.arsip.length} arsip`;
 }
 // prompt & laporan tidak ikut di daftar ringkas -> ambil per agen saat dipilih (segar lagi tiap 15 dtk)
@@ -1715,7 +2219,9 @@ function pilih(id, terbang=true){
   if (o && terbang){ kam.fokus = o; kam.zoomTuju = Math.max(kam.zoomTuju, 1.8); }
   gambarDaftar(); gambarDetail();
 }
-$('daftar').addEventListener('click', e => { const it = e.target.closest('.item'); if (it) pilih(it.dataset.id); });
+$('daftar').addEventListener('click', e => {
+  if (e.target.closest('.grpLipat')){ arsipSembunyi = !arsipSembunyi; try { localStorage.setItem('desaArsip', arsipSembunyi ? 'sembunyi' : ''); } catch (e2) {} gambarDaftar(); return; }
+  const it = e.target.closest('.item'); if (it) pilih(it.dataset.id); });
 $('kanan').querySelector('.tutup').onclick = () => { pilihId = null; QUEST.pilih = null; sorot.visible = false; if (TAB === 'quest') gambarQuest(); for (const o of AGEN.values()){ o.s.cincin.visible=false; tulisLabel(o); } gambarDetail(); gambarDaftar(); };
 
 // ═════ KONTROL KAMERA ═════
@@ -1740,7 +2246,7 @@ function geser(dx, dy){
   kam.target.x = Math.max(-90, Math.min(90, kam.target.x)); kam.target.z = Math.max(-90, Math.min(90, kam.target.z));
 }
 const tombol = new Set();
-addEventListener('keydown', e => { if (e.target.tagName==='INPUT') return; const k=e.key.toLowerCase(); tombol.add(k);
+addEventListener('keydown', e => { if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return; const k=e.key.toLowerCase(); tombol.add(k);
   if (k==='q') kam.azTuju -= Math.PI/2; if (k==='e') kam.azTuju += Math.PI/2; if (k==='escape') $('kanan').querySelector('.tutup').click(); });
 addEventListener('keyup', e => tombol.delete(e.key.toLowerCase()));
 $('bKiri').onclick = () => kam.azTuju -= Math.PI/2; $('bKanan').onclick = () => kam.azTuju += Math.PI/2;
@@ -1946,12 +2452,21 @@ function petaTik(dtAsli){
   if ($('peta').style.display === 'none') return;
   PETA.t += dtAsli; if (PETA.t < 0.15) return; PETA.t = 0; gambarPeta();
 }
-addEventListener('keydown', e => { if (e.target.tagName === 'INPUT' || e.key.toLowerCase() !== 'm') return; const p = $('peta'); p.style.display = p.style.display === 'none' ? '' : 'none'; });
+// bar tombol bawah bisa disembunyikan (tombol panah atau H); pilihan diingat per browser
+function aturKontrol(ciut){
+  $('kontrol').classList.toggle('ciut', ciut);
+  const b = $('bKontrol'); b.innerHTML = ciut ? '&#9654;' : '&#9664;'; b.title = ciut ? 'Tampilkan tombol (H)' : 'Sembunyikan tombol (H)'; b.setAttribute('aria-label', b.title);
+  try { localStorage.setItem('desaKontrol', ciut ? 'ciut' : ''); } catch (e) {}
+}
+$('bKontrol').onclick = () => aturKontrol(!$('kontrol').classList.contains('ciut'));
+try { if (localStorage.getItem('desaKontrol') === 'ciut') aturKontrol(true); } catch (e) {}
+addEventListener('keydown', e => { if (!/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'h') $('bKontrol').click(); });
+addEventListener('keydown', e => { if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.key.toLowerCase() !== 'm') return; const p = $('peta'); p.style.display = p.style.display === 'none' ? '' : 'none'; });
 
 // hash URL opsional: #kam=x,z[,zoom[,putaran]] -> posisi kamera awal (pintasan & uji visual), mis. /desa#kam=-34,8,1.6
 { const m = /kam=(-?[\d.]+),(-?[\d.]+)(?:,([\d.]+))?(?:,(-?\d+))?/.exec(location.hash);
   if (m){ kam.target.set(+m[1], 0, +m[2]); if (m[3]) kam.zoom = kam.zoomTuju = Math.min(3.2, Math.max(0.4, +m[3])); if (m[4]) kam.az = kam.azTuju = Math.PI/4 + (+m[4])*Math.PI/2; } }
-gabungStatis(); terapkanKualitas(); atmosfer(1); tulisTombolWaktu(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); loop();
+gabungStatis(); terapkanKualitas(); atmosfer(1); tulisTombolWaktu(); ambil(); setInterval(ambil, POLL_MS); ambilQuest(); setInterval(ambilQuest, 30000); ambilChat(); ambilPakai(); setInterval(ambilPakai, 30000); ambilPerlu(); loop();
 </script>
 </body>
 </html>
