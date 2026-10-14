@@ -124,7 +124,12 @@ body.ukurPanel{user-select:none}
 .mg-kamu{align-self:flex-end;background:linear-gradient(#f0d48a,#e2bd66);border-color:#b8913a;color:#2a1a0c;border-bottom-right-radius:3px}
 .mtanya{display:block;margin:6px 0;padding:6px 8px 6px 9px;border-radius:7px;background:#fff1c2;border:1px solid #d9a83a;border-left:4px solid #c9821e;white-space:normal}
 .mtanya .mtj{display:block;font:700 11.5px/1.3 var(--serif);color:#8a4a0e;letter-spacing:.02em;margin-bottom:2px}
-.mtanya ol{margin:2px 0 0;padding-left:18px}.mtanya li{margin:2px 0;white-space:pre-wrap}
+.mtanya ol{margin:2px 0 0;padding-left:18px}
+.mopsi{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 2px}
+.mop{font:inherit;font-size:11.5px;padding:2px 9px;border-radius:999px;border:1px solid #c9821e;background:#fffaf0;color:#5a3410;cursor:pointer}
+.mop:hover{background:#ffe7a8}.mop.on{background:linear-gradient(#f0cc6a,#d4a447);border-color:#8a5a1e;color:#2a1a0c;font-weight:700}
+.mop b{font-weight:inherit}
+.mtanya.lama{opacity:.72;border-left-color:#b8a07a}.mtsudah{font:400 10.5px system-ui,sans-serif;color:#8a6e4a;margin-left:6px}.mtanya li{margin:2px 0;white-space:pre-wrap}
 .mg-master{align-self:flex-start;background:rgba(255,252,240,.85);border-bottom-left-radius:3px}
 .mg-masuk{align-self:flex-start;background:rgba(214,232,206,.7);border-color:rgba(60,110,50,.3);border-bottom-left-radius:3px}
 .mg .dari{display:block;font:700 10.5px/1.3 var(--serif);letter-spacing:.04em;color:#4a6a30;margin-bottom:2px}
@@ -213,6 +218,162 @@ body.ukurPanel{user-select:none}
   #pakaiRinci{left:12px;right:12px;width:auto;top:auto;bottom:60px;max-height:46%}
   #kontrol .bantu,#peta{display:none}
 }
+
+/* ═════ PENYEMPURNAAN UI PANEL (satu bahasa visual) ═════
+   Warna status SAMA di semua tempat: kerja = hijau, menunggu / siap = biru, diam = kuning, mati / selesai = abu. */
+:root{--st-kerja:#3fae5a;--st-tunggu:#3f8fd0;--st-diam:#d99a2b;--st-mati:#a39a88}
+.d-jalan,.d-sibuk{background:var(--st-kerja);box-shadow:0 0 0 2px rgba(63,174,90,.2)}
+.d-sibuk{animation:kedip 1.2s ease-in-out infinite}
+.d-menunggu,.d-siap{background:var(--st-tunggu);box-shadow:none}
+.d-diam{background:var(--st-diam);box-shadow:none}
+.d-selesai,.d-mati{background:var(--st-mati);box-shadow:none}
+.msc i.sibuk{background:var(--st-kerja)}.msc i.siap{background:var(--st-tunggu)}
+/* panel kiri: tinggi ikut isi (tak ada ruang kosong), kepala lebih rapi */
+#kiri{bottom:auto;max-height:calc(100% - 24px)}
+#daftar{flex:0 1 auto;padding:4px 8px 10px}
+#kiri header{padding:12px 14px 10px}
+#kiri h1 a{border:1px solid #c4a777;border-radius:999px;padding:3px 9px;font-size:11px;color:var(--teks2);background:rgba(255,250,235,.55)}
+#kiri h1 a:hover{background:rgba(232,196,106,.35)}
+.ringkas{display:flex;flex-wrap:nowrap;gap:10px;margin-top:6px;font-size:11.5px;color:var(--teks2);white-space:nowrap;overflow:hidden}
+.ringkas .rk{display:inline-flex;align-items:center;gap:5px}.ringkas .rk .dot{width:8px;height:8px}
+.grp{margin:14px 6px 6px;font-size:10.5px}
+.item{padding:6px 9px;gap:9px;margin:1px 0}
+.item .nm{font-size:13px}
+.item .wkt{min-width:44px;text-align:right;font-size:11px}
+.item .stTeks{font-size:10.5px;padding:1px 7px;border-radius:999px;font-weight:600}
+.item .st-jalan{background:rgba(63,174,90,.14);color:#2c7a40}.item .st-menunggu{background:rgba(63,143,208,.14);color:#2a6496}
+.item .st-diam{background:rgba(217,154,43,.16);color:#8a5a10}.item .st-selesai{background:rgba(120,110,90,.14);color:#6a5e48}
+.grpLipat .mbtn{font-size:10.5px;padding:1px 7px}
+/* panel Perlu jawaban: di samping panel kiri, tak menabrak panel Chat Master */
+#perlu{left:320px;transform:none;width:min(360px,calc(100% - 340px));z-index:11}  /* di bawah panel Chat (12) kalau layar sempit */
+@media (max-width:820px){#perlu{left:12px;right:12px;width:auto;top:auto;bottom:60px}}
+/* panel Chat Master: status di baris judul, menu utk aksi berisiko, area pesan diutamakan */
+.mjudul{gap:8px;padding:7px 8px 7px 12px}
+.mjudul .mjst{display:inline-flex;align-items:center;gap:6px;min-width:0;flex:1;font-size:11.5px;color:var(--teks2)}
+.mjudul .mjst .dot{width:8px;height:8px;flex:none}
+.mjudul #mStatus{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mjudul .tutup{margin-left:0}
+.mmenu{position:relative;flex:none}
+.mmenub{font:700 15px/1 system-ui,sans-serif;width:26px;height:24px;border-radius:6px;border:1px solid transparent;background:none;color:var(--kayu);cursor:pointer}
+.mmenub:hover,.mmenu.buka .mmenub{border-color:#c4a777;background:rgba(232,196,106,.3)}
+.mmenul{display:none;position:absolute;right:0;top:28px;z-index:6;min-width:190px;padding:4px;border-radius:8px;background:#fbf3dd;border:1px solid #8a6a3a;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.mmenu.buka .mmenul{display:block}
+.mmenul button{display:block;width:100%;text-align:left;font:inherit;font-size:12px;padding:6px 9px;border:0;border-radius:6px;background:none;color:var(--teks);cursor:pointer}
+.mmenul button:hover{background:rgba(232,196,106,.35)}.mmenul button.bahaya{color:#9a2a20}
+.mmenul .ket{display:block;font-size:10.5px;color:var(--teks3)}
+.mstat{display:none}
+#mLog{padding:10px 12px;gap:8px}
+.mg{max-width:86%;padding:7px 10px;border-radius:10px;line-height:1.45}
+.mg-kamu{max-width:78%}
+.mg.panjang .isiP{display:block;max-height:240px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 70%,transparent);mask-image:linear-gradient(#000 70%,transparent)}
+.mg.panjang.lengkap .isiP{max-height:none;-webkit-mask-image:none;mask-image:none}
+.mlebih{display:block;margin-top:4px;font:600 11px system-ui,sans-serif;color:#8a5a1e;background:none;border:0;padding:0;cursor:pointer}
+.mk{align-self:stretch;font-size:11.5px;border:1px dashed rgba(168,118,30,.5);border-radius:8px;background:rgba(255,250,235,.5)}
+.mk summary{list-style:none;display:flex;align-items:center;gap:7px;padding:4px 9px;margin:0;cursor:pointer;color:var(--teks2)}
+.mk summary::-webkit-details-marker{display:none}
+.mk summary .ke{flex:none;font-weight:700;color:var(--kayu)}
+.mk summary .r{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mk summary::after{content:"lihat";flex:none;font-size:10.5px;color:#8a5a1e}.mk[open] summary::after{content:"tutup"}
+.mk pre{margin:0 9px 8px;max-height:200px}
+/* komposer: tujuan & saran masing-masing satu baris yg bisa digeser, lampiran ringkas */
+.mkomposer{border-top:1px solid var(--garis);background:linear-gradient(transparent,rgba(255,250,235,.35))}
+#mSesi,#mSaran.ada{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;gap:5px;padding:6px 10px 2px;max-height:none;border-top:0;scrollbar-width:thin}
+#mSesi .lbl2,#mSaran .lbl2{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--teks3);margin-right:1px}
+.msc,.msr{flex:none;font-size:11.5px;padding:2px 9px}
+.msr-ai{flex:none;margin-left:0;order:-1;font:700 10px/1 system-ui,sans-serif;padding:3px 7px;border-radius:999px}
+#mLamp.ada{display:flex;padding:6px 10px 0;border-top:0;gap:6px}
+.mli{width:40px;height:40px}
+#mForm{border-top:0;padding:6px 10px 10px}
+#mTeks{min-height:38px;border-radius:8px}
+#mKirim{border-radius:8px}
+
+#mLog{overflow-x:hidden}
+.mtanya .msub{margin:3px 0 2px;padding-left:16px;list-style:disc}.mtanya .msub li{margin:1px 0}
+
+/* ═════ SCROLLBAR BERTEMA (semua area scroll) ═════
+   Chrome/Edge >= 121 MENGABAIKAN ::-webkit-scrollbar kalau scrollbar-width / scrollbar-color diisi (bukan auto),
+   jadi properti standar hanya utk Firefox (@supports -moz). Tipis, track transparan, thumb kayu-emas membulat, tanpa panah. */
+#mSesi,#mSaran.ada{scrollbar-width:auto;padding-bottom:4px}
+::-webkit-scrollbar{width:9px;height:7px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:linear-gradient(135deg,#c79a4e,#8a5a28);border-radius:999px;border:2px solid transparent;background-clip:padding-box;min-height:30px}
+::-webkit-scrollbar-thumb:hover{background:linear-gradient(135deg,#e2b456,#a8761e);border-width:1px;background-clip:padding-box}
+::-webkit-scrollbar-thumb:active{background:#7a4c20}
+::-webkit-scrollbar-button{display:none;width:0;height:0}
+::-webkit-scrollbar-corner{background:transparent}
+@supports (-moz-appearance:none){*{scrollbar-width:thin;scrollbar-color:#a8762e transparent}}
+
+/* ═════ GAYA A: KAYU / KERTAS PREMIUM ═════
+   Kedalaman berlapis, pita kepala perkamen bergaris emas ganda, judul kapital kecil, kartu agen bersegel inisial,
+   animasi mikro ringan (hover, pesan baru, cincin "kerja", titik "berpikir"). Hanya panel; peta desa tak disentuh. */
+.panel{box-shadow:inset 0 0 0 1px #c9a24a,inset 0 0 0 4px rgba(255,248,225,.32),inset 0 0 0 5px rgba(168,118,30,.18),inset 0 0 38px rgba(150,100,40,.26),0 2px 0 #2a1a0c,0 16px 36px rgba(20,10,0,.48)}
+#kiri header,.mjudul,#perlu .pkep{background:linear-gradient(180deg,#fdf6e2 0%,#f3e3bc 100%);border-bottom:1px solid #c9a24a;box-shadow:inset 0 -3px 0 -2px rgba(255,250,235,.95),0 1px 0 rgba(90,59,34,.12);position:relative}
+#kiri header::after,.mjudul::after{content:"";position:absolute;left:14px;right:14px;bottom:-4px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,162,74,.75),transparent);pointer-events:none}
+#kiri h1{font-size:20px;font-variant:small-caps;letter-spacing:.05em}
+.mjudul b{font-variant:small-caps;letter-spacing:.06em;font-size:16px}
+#perlu .pkep>span:nth-child(2){font-variant:small-caps;letter-spacing:.05em;font-size:14px}
+.grp{font-variant:small-caps;text-transform:none;font-size:12px;letter-spacing:.07em}
+/* ikon SVG seragam (16px, currentColor) */
+.ik{width:14px;height:14px;display:inline-block;vertical-align:-2px;flex:none}
+.tutup .ik,.mmenub .ik{width:15px;height:15px}
+.mjudul .tutup,#pakaiRinci .tutup,#kanan .tutup{display:inline-flex;align-items:center;justify-content:center;width:26px;height:24px;border-radius:6px;font-size:0;color:var(--kayu)}
+.mjudul .tutup:hover,#pakaiRinci .tutup:hover,#kanan .tutup:hover{background:rgba(168,50,40,.12);color:#9a2a20}
+.mmenub{display:inline-flex;align-items:center;justify-content:center;font-size:0}
+/* kartu agen: segel inisial + nama + aktivitas terakhir */
+.item.kartu{gap:10px;padding:7px 9px;border-radius:9px;transition:background .15s,border-color .15s,transform .15s,box-shadow .15s}
+.item.kartu:hover{transform:translateX(2px);background:rgba(255,250,235,.7);box-shadow:0 1px 0 rgba(90,59,34,.12)}
+.item.kartu.pilih{background:linear-gradient(90deg,rgba(240,204,106,.32),rgba(255,250,235,.4));box-shadow:inset 3px 0 0 #c9a24a}
+.ava{position:relative;flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 11.5px/1 var(--serif);letter-spacing:.02em;color:#fff8e6;text-shadow:0 1px 1px rgba(0,0,0,.45);
+  background:radial-gradient(circle at 32% 28%,hsl(var(--h) 55% 58%),hsl(var(--h) 52% 36%) 62%,hsl(var(--h) 55% 24%));box-shadow:0 0 0 2px #fbf2dc,0 0 0 4px var(--st,#a39a88),0 2px 4px rgba(40,20,0,.35)}
+.ava.st-jalan{--st:var(--st-kerja)}.ava.st-menunggu{--st:var(--st-tunggu)}.ava.st-diam{--st:var(--st-diam)}.ava.st-selesai{--st:var(--st-mati)}
+.ava.st-jalan::after{content:"";position:absolute;inset:-4px;border-radius:50%;box-shadow:0 0 0 2px var(--st-kerja);animation:denyutKerja 1.8s ease-out infinite}
+@keyframes denyutKerja{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+.item.kartu .isiK{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.item.kartu .nm{font-size:13px;font-weight:600;color:var(--teks)}
+.item.kartu .akt{font-size:11px;color:var(--teks3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.item.kartu .kananK{display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex:none}
+.item.kartu.arsip{padding:4px 9px}.item.kartu.arsip .ava{width:22px;height:22px;font-size:9px;box-shadow:0 0 0 2px #fbf2dc,0 0 0 3px var(--st)}
+.item.kartu.arsip .akt{display:none}.item.kartu.arsip .nm{font-weight:400;font-size:12.5px}
+/* strip usage */
+#pakai{border:1px solid #d3b886;background:linear-gradient(rgba(255,252,242,.85),rgba(246,232,200,.6));box-shadow:inset 0 1px 0 #fffaf0,0 1px 2px rgba(90,59,34,.12)}
+.pkb>span:first-child{font-variant:small-caps;letter-spacing:.04em;font-size:11.5px}
+.pkbar{height:7px;background:rgba(90,59,34,.12);box-shadow:inset 0 1px 2px rgba(60,40,10,.25)}
+.pkbar i{background-image:linear-gradient(rgba(255,255,255,.35),transparent 60%)!important;background-blend-mode:normal}
+/* panel Chat: pesan baru masuk, titik berpikir, kotak ketik */
+.anim-masuk{animation:masukPesan .32s cubic-bezier(.2,.8,.3,1)}
+@keyframes masukPesan{from{opacity:0;transform:translateY(8px) scale(.985)}}
+.ketik{display:inline-flex;gap:3px;margin-left:5px;vertical-align:middle}.ketik i{width:4px;height:4px;border-radius:50%;background:var(--st-kerja);animation:ketikTitik 1s infinite}
+.ketik i:nth-child(2){animation-delay:.15s}.ketik i:nth-child(3){animation-delay:.3s}
+@keyframes ketikTitik{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-3px);opacity:1}}
+.mg{box-shadow:0 1px 0 rgba(90,59,34,.1),0 2px 6px rgba(90,59,34,.06)}
+.mg-master{background:linear-gradient(#fffdf6,#fbf3df)}
+.mg-kamu{box-shadow:0 1px 0 rgba(90,59,34,.2),0 2px 6px rgba(140,90,20,.15)}
+#mTeks{box-shadow:inset 0 1px 3px rgba(90,59,34,.18);transition:border-color .15s,box-shadow .15s}
+#mTeks:focus{outline:none;border-color:#c9a24a;box-shadow:inset 0 1px 3px rgba(90,59,34,.18),0 0 0 3px rgba(232,196,106,.35)}
+#mKirim{display:inline-flex;align-items:center;gap:6px;transition:filter .12s,transform .08s}#mKirim:hover{filter:brightness(1.08)}#mKirim:active{transform:translateY(1px)}
+.msc,.msr,.mop,.mbtn,.qpr,.qchip{transition:background .15s,border-color .15s,transform .1s}
+.msc:hover,.msr:hover,.mop:hover{transform:translateY(-1px)}
+/* tab riwayat: tab perkamen dgn garis emas di atas tab aktif */
+#mTab button{border-radius:8px 8px 0 0;background:rgba(245,232,200,.55);transition:background .15s}
+#mTab button.on{background:linear-gradient(#fffaf0,#f6e7c2);color:var(--kayu2);box-shadow:inset 0 2px 0 #c9a24a}
+/* Perlu jawaban: kartu dgn garis aksen per jenis */
+.pit{border-left:3px solid transparent;transition:background .15s}
+.pit:has(.jn-tanya){border-left-color:#e2b456}.pit:has(.jn-izin){border-left-color:#d8806a}
+.pit .x{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:5px;font-size:0}
+.pit .x:hover{background:rgba(168,50,40,.12);color:#9a2a20}
+
+/* ═════ "Perlu jawabanmu" menyatu di atas panel kiri: tak pernah tertimpa panel lain ═════ */
+#perlu{position:static;left:auto;top:auto;right:auto;bottom:auto;transform:none;width:auto;z-index:auto;margin:8px 10px 2px;padding:0;
+  border:1px solid #d9a83a;border-radius:10px;background:linear-gradient(#fff8e2,#fbecc4);box-shadow:inset 0 1px 0 #fffdf4,0 2px 6px rgba(140,90,20,.18);overflow:hidden;flex:none}
+#perlu::before,#perlu::after{display:none}
+#perlu .pkep{padding:6px 10px;background:linear-gradient(180deg,#fff6dc,#f6e0a8);border-bottom:1px solid rgba(201,162,74,.6);box-shadow:none}
+#perlu .pkep .ket{font-size:10.5px}
+#perlu .pdaf{max-height:210px;border-top:0}
+#perlu .pit{padding:6px 8px 6px 9px}
+#perlu .pit .isi .q{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;white-space:normal}
+#perlu .pit .isi b{font-size:12px}
+@media (max-width:820px){#perlu{left:auto;right:auto;width:auto;top:auto;bottom:auto}}
+#perlu .pkep{flex-wrap:nowrap;white-space:nowrap}#perlu .pkep>span:nth-child(2){font-size:13px;white-space:nowrap}#perlu .pkep .ket{margin-left:auto;white-space:nowrap}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
@@ -222,21 +383,25 @@ body.ukurPanel{user-select:none}
   <header><h1>Desa Agen <a href="/">dashboard</a></h1><div class="ringkas" id="ringkas">memuat...</div>
     <button id="pakai" title="Pemakaian plan Claude - klik untuk rincian"></button>
     <div class="tabs"><button class="tab on" data-tab="agen">Agen</button><button class="tab" data-tab="quest">Quest QA</button></div></header>
+  <div id="perlu" aria-live="polite"><div class="pkep" title="Klik untuk melipat"><span class="jml">0</span><span>Perlu jawabanmu</span><span class="ket">klik untuk membuka</span></div><div class="pdaf"></div></div>
   <div id="daftar"></div>
   <div id="quest" style="display:none"></div>
 </aside>
 <aside id="master" class="panel" aria-label="Chat Master">
     <span class="mrz mrz-w" data-a="w"></span><span class="mrz mrz-e" data-a="e"></span><span class="mrz mrz-s" data-a="s"></span><span class="mrz mrz-sw" data-a="sw" title="Ubah ukuran"></span><span class="mrz mrz-se" data-a="se" title="Ubah ukuran"></span>
-    <div class="mjudul" id="mJudul" title="Seret untuk memindahkan, tarik sudut kanan bawah untuk mengubah ukuran"><b>Chat Master</b><span>koordinator sesi</span><button class="tutup" id="mTutup" aria-label="Tutup">&times;</button></div>
-    <div class="mstat"><span class="dot d-mati" id="mDot"></span><span id="mStatus">memuat...</span>
-      <span class="ktl"><button class="mbtn" id="mUlang" title="Hentikan proses Master. Kiriman berikutnya melanjutkan percakapan yang sama.">Mulai ulang</button><button class="mbtn" id="mBaru" title="Hentikan Master dan mulai percakapan baru (konteks lama dilupakan).">Percakapan baru</button></span></div>
+    <div class="mjudul" id="mJudul" title="Seret untuk memindahkan, tarik tepi atau sudut untuk mengubah ukuran"><b>Chat Master</b><span class="mjst"><span class="dot d-mati" id="mDot"></span><span id="mStatus">memuat...</span></span>
+      <span class="mmenu" id="mMenu"><button type="button" class="mmenub" id="mMenuB" title="Menu" aria-label="Menu" aria-haspopup="true">&#8943;</button>
+        <span class="mmenul" role="menu"><button type="button" id="mUlang" role="menuitem">Mulai ulang proses<span class="ket">percakapan dilanjutkan sesudahnya</span></button><button type="button" id="mBaru" class="bahaya" role="menuitem">Percakapan baru<span class="ket">konteks lama dilupakan</span></button></span></span>
+      <button class="tutup" id="mTutup" aria-label="Tutup">&times;</button></div>
     <div id="mTab"><button type="button" data-v="master" class="on">Chat Master</button><button type="button" data-v="riwayat">Riwayat</button></div>
     <div id="mLog"></div>
+    <div class="mkomposer">
     <div id="mSesi"></div>
     <div id="mSaran"></div>
     <div id="mLamp"></div>
     <div id="mGalat" role="alert"></div>
     <form id="mForm"><textarea id="mTeks" rows="2" maxlength="8000" placeholder="Tulis ke Master... (Enter kirim, Shift+Enter baris baru, Ctrl+V tempel gambar)"></textarea><button id="mKirim" type="submit">Kirim</button></form>
+    </div>
 </aside>
 <aside id="pakaiRinci" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="pakaiIsi"></div></aside>
 <aside id="kanan" class="panel"><button class="tutup" aria-label="Tutup">&times;</button><div id="detail"></div></aside>
@@ -245,7 +410,6 @@ body.ukurPanel{user-select:none}
   <button id="bReset">Reset</button><button id="bLabel" class="on">Gelembung</button><button id="bDemo">Demo</button><button id="bWaktu" title="Waktu desa: Otomatis (1 menit = 1 jam desa) atau dikunci Pagi/Siang/Senja/Malam">Waktu</button><button id="bSuara" title="Suara ambience: angin, burung, jangkrik, api, denting palu">Suara: Mati</button><button id="bHemat" title="Kualitas grafis. Hemat: maks 60 fps, tanpa efek, bayangan, rumput &amp; partikel. Normal: bayangan + bloom + tilt-shift, maks 60 fps, resolusi dinamis. Ultra: + ambient occlusion, bayangan tajam, resolusi lebih tinggi.">Grafis: Normal</button>
   <span class="bantu">Drag geser · Scroll zoom · WASD · Q/E putar · M peta · H tombol</span>
 </div>
-<div id="perlu" class="panel" aria-live="polite"><div class="pkep" title="Klik untuk melipat"><span class="jml">0</span><span>Perlu jawabanmu</span><span class="ket">klik item untuk membuka sesinya</span></div><div class="pdaf"></div></div>
 <div id="galat"></div>
 <div id="tip"></div>
 <div id="peta" class="panel" title="Peta desa - klik untuk terbang ke titik itu (tombol M: sembunyikan)"><canvas id="petaK" width="376" height="376"></canvas><div class="kaki"><span id="petaJam">-</span><span id="petaFps">- fps</span></div></div>
@@ -272,6 +436,17 @@ const AKTIVITAS = {tempa:'Menempa', panas:'Memanaskan besi', celup:'Mencelup bes
   teropong:'Meneropong', tulis:'Menulis', tidur:'Tertidur', santai:'Santai di kedai', lapor:'Menyerahkan laporan', jalan:'Berjalan', diam:'Berdiri',
   perintah:'Memberi tugas', menunggu:'Menunggu balasanmu'};
 const $ = id => document.getElementById(id);
+// ikon kecil seragam (SVG, currentColor) utk panel
+const IK = {
+  tutup: '<svg class="ik" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+  menu: '<svg class="ik" viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.3" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="12.7" cy="8" r="1.5" fill="currentColor"/></svg>',
+  teruskan: '<svg class="ik" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 12.5c.6-4 3.2-6 7.5-6h2.5M9.5 3.5l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  kirim: '<svg class="ik" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8.2L14 2.5 10.6 14 8 9.3z" fill="currentColor" opacity=".9"/><path d="M8 9.3L14 2.5" stroke="#fff4d6" stroke-width="1" opacity=".7"/></svg>',
+  bawah: '<svg class="ik" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  kanan: '<svg class="ik" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+};
+for (const [sel, ik] of [['#mTutup', 'tutup'], ['#pakaiRinci .tutup', 'tutup'], ['#kanan .tutup', 'tutup'], ['#mMenuB', 'menu']]){ const e = document.querySelector(sel); if (e) e.innerHTML = IK[ik]; }
+{ const k = document.getElementById('mKirim'); if (k) k.innerHTML = IK.kirim + '<span>Kirim</span>'; }
 // ikon peran (SVG 16x16, warna = currentColor)
 const IKON = {
   Dev: '<svg viewBox="0 0 16 16"><path d="M1.5 5.2 5.6 1.5l2.7 2.2-1.1 1.1 6.6 6.6-2.1 2.1-6.6-6.6-1.1 1.1z"/></svg>',
@@ -282,7 +457,9 @@ const IKON = {
   Lain: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h8v9a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5zM10.5 5.5h1.8a1.7 1.7 0 0 1 1.7 1.7v1.6a1.7 1.7 0 0 1-1.7 1.7h-1.8v-1.4h1.6a.6.6 0 0 0 .6-.6V7.5a.6.6 0 0 0-.6-.6h-1.6z"/></svg>'};
 const pil = (p, teks = p) => `<span class="peran p-${esc(p)}">${IKON[p] || ''}${esc(teks)}</span>`;
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const dur = s => {s=Math.max(0,Math.round(s));const j=Math.floor(s/3600),m=Math.floor(s%3600/60),d=s%60;return j?`${j}j ${m}m`:m?`${m}m ${String(d).padStart(2,'0')}d`:`${d}d`};
+// umur / durasi dalam satuan jelas: "45 dtk", "13 mnt", "2 j 5 mnt", "3 hr 4 j"
+const dur = s => {s=Math.max(0,Math.round(s));const h=Math.floor(s/86400),j=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+  return h?`${h} hr${j?` ${j} j`:''}`:j?`${j} j${m?` ${m} mnt`:''}`:m?`${m} mnt`:`${s} dtk`};
 const jam = t => new Date(t*1000).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
 const V = (x,y,z) => new THREE.Vector3(x,y,z);
 
@@ -1374,28 +1551,58 @@ const STATUS_M = {mati:'Master mati', siap:'Master siap', sibuk:'Master berpikir
 const teksChat = s => esc(s).replace(/`([^`\n]+)`/g, '<code>$1</code>').replace(/\*\*([^*\n]+)\*\*/g, '<b>$1</b>');
 // blok pertanyaan klarifikasi Master: baris "**Perlu kamu jawab:**" + daftar bernomor -> kotak sorotan
 const RE_TANYA = /^\s*\*\*\s*Perlu kamu jawab\s*:?\s*\*\*\s*:?\s*$/im;
-function teksJawab(s){
+// pilihan jawaban satu poin (gratis, dari teks Master): >= 2 teks tebal ("**A (rapihin)**", "**ya**"),
+// atau pola "(x / y)". Nilai: huruf opsi kalau diawali A-D ("A (rapihin)" -> "A"), selain itu teksnya.
+function opsiPoin(x){
+  let xs = [...x.matchAll(/\*\*([^*\n]{1,40})\*\*/g)].map(m => m[1].trim());
+  if (xs.length < 2){ const m = x.match(/\(([^()]{1,80}\/[^()]{1,80})\)/); xs = m ? m[1].split('/').map(t => t.replace(/\*/g, '').trim()) : []; }
+  xs = [...new Set(xs.filter(t => t && t.length <= 40))].slice(0, 5);
+  return xs.length >= 2 ? xs.map(t => ({label: t, nilai: (t.match(/^([A-D])(?=$|[\s(.:)])/) || [])[1] || t})) : [];
+}
+function teksJawab(s, ctx){
   const m = RE_TANYA.exec(s); if (!m) return teksChat(s);
   const pra = s.slice(0, m.index), sisa = s.slice(m.index + m[0].length).split('\n'), poin = [];
+  // poin = butir bernomor (atau butir "-" kalau tak bernomor). Butir "-" di bawah poin bernomor = PILIHAN poin itu.
+  const RE_NUM = /^\s*\d+[.)]\s+/, RE_DASH = /^\s*[-*]\s+/;
   let i = 0;
-  for (; i < sisa.length; i++){ const b = sisa[i];
-    if (/^\s*$/.test(b) && !poin.length) continue;
-    if (/^\s*(\d+[.)]|[-*])\s+/.test(b)){ poin.push(b.replace(/^\s*(\d+[.)]|[-*])\s+/, '')); continue; }
-    if (/^\s{2,}\S/.test(b) && poin.length){ poin[poin.length - 1] += ' ' + b.trim(); continue; }  // lanjutan poin
+  for (; i < sisa.length; i++){ const b = sisa[i], P = poin[poin.length - 1];
+    if (/^\s*$/.test(b)){ if (!poin.length) continue;
+      const nx = sisa.slice(i + 1).find(x => x.trim()); if (nx && (RE_NUM.test(nx) || RE_DASH.test(nx))) continue; break; }
+    if (RE_DASH.test(b) && P && P.num){ P.sub.push(b.replace(RE_DASH, '')); continue; }
+    if (RE_NUM.test(b) || RE_DASH.test(b)){ poin.push({t: b.replace(RE_NUM, '').replace(RE_DASH, ''), num: RE_NUM.test(b), sub: []}); continue; }
+    if (/^\s{2,}\S/.test(b) && P){ if (P.sub.length) P.sub[P.sub.length - 1] += ' ' + b.trim(); else P.t += ' ' + b.trim(); continue; }  // lanjutan baris
     break; }
   if (!poin.length) return teksChat(s);
   const pasca = sisa.slice(i).join('\n').replace(/^\n+/, '');
-  return teksChat(pra.replace(/\n+$/, '')) + `<span class="mtanya"><span class="mtj">Perlu kamu jawab</span><ol>${poin.map(x => `<li>${teksChat(x)}</li>`).join('')}</ol></span>` + (pasca ? teksChat(pasca) : '');
+  const aktif = ctx && ctx.aktif, pilih = aktif && MCHAT.jawab.id === ctx.id ? MCHAT.jawab.p : {};
+  const li = poin.map((P, k) => { const os = aktif ? opsiPoinLengkap(P) : [];
+    const sub = P.sub.length ? `<ul class="msub">${P.sub.map(x => `<li>${teksChat(x)}</li>`).join('')}</ul>` : '';
+    return `<li>${teksChat(P.t)}${sub}${os.length ? `<span class="mopsi">${os.map(o => `<button type="button" class="mop${pilih[k + 1] === o.nilai ? ' on' : ''}" data-id="${ctx.id}" data-p="${k + 1}" data-n="${poin.length}" data-v="${esc(o.nilai)}">${teksChat(o.label)}</button>`).join('')}</span>` : ''}</li>`; }).join('');
+  const sudah = ctx && ctx.dijawab ? '<span class="mtsudah">sudah dijawab</span>' : '';
+  return teksChat(pra.replace(/\n+$/, '')) + `<span class="mtanya${ctx && ctx.dijawab ? ' lama' : ''}"><span class="mtj">Perlu kamu jawab${sudah}</span><ol>${li}</ol></span>` + (pasca ? teksChat(pasca) : '');
+}
+// pilihan satu poin: dari teks poin itu sendiri, atau dari sub-butirnya ("- **A (biarin)**: ..." -> "A (biarin)")
+function opsiPoinLengkap(P){
+  const os = opsiPoin(P.t); if (os.length || P.sub.length < 2) return os;
+  const xs = P.sub.map(x => { const m = x.match(/^\s*\*\*([^*\n]{1,40})\*\*/) || x.match(/^\s*([^:\n]{1,40}):/); return m ? m[1].trim() : null; }).filter(Boolean);
+  return xs.length >= 2 ? [...new Set(xs)].slice(0, 6).map(t => ({label: t, nilai: (t.match(/^([A-D])(?=$|[\s(.:)])/) || [])[1] || t})) : [];
 }
 const jamChat = w => new Date(w*1000).toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+// pesan panjang (> 900 karakter, tanpa blok "Perlu kamu jawab") dilipat; status buka diingat per id
+MCHAT.lengkap = new Set();
+function lipatPanjang(e, kelas, jam, isi){
+  if (e.teks.length <= 900 || RE_TANYA.test(e.teks)) return `<div class="${kelas}" ${jam}>${isi}</div>`;
+  const buka = MCHAT.lengkap.has(e.id);
+  return `<div class="${kelas} panjang${buka ? ' lengkap' : ''}" ${jam}><span class="isiP">${isi}</span><button type="button" class="mlebih" data-id="${e.id}">${buka ? 'Lipat' : 'Tampilkan semua'}</button></div>`;
+}
 function barisChat(e){
   const jam = `title="${jamChat(e.w)}"`;
   if (e.j === 'kamu'){ const g = (e.gambar || []).map(n => `<a href="/api/master/lampiran/${encodeURIComponent(n)}" target="_blank" rel="noopener"><img src="/api/master/lampiran/${encodeURIComponent(n)}" alt="lampiran" loading="lazy"></a>`).join('');
     return `<div class="mg mg-kamu" ${jam}>${e.ke ? `<span class="ke">ke ${esc(e.ke)}</span>` : ''}${teksChat(e.teks)}${g ? `<span class="gbr">${g}</span>` : ''}</div>`; }
-  if (e.j === 'master') return `<div class="mg mg-master" ${jam}>${teksJawab(e.teks)}</div>`;
-  if (e.j === 'masuk') return `<div class="mg mg-masuk" ${jam}><span class="dari">dari ${esc(e.dari)}</span>${teksChat(e.teks)}</div>`;
+  if (e.j === 'master') return lipatPanjang(e, 'mg mg-master', jam, teksJawab(e.teks, {id: e.id, aktif: e.id === MCHAT.tanyaAktif, dijawab: e.id !== MCHAT.tanyaAktif && RE_TANYA.test(e.teks)}));
+  if (e.j === 'masuk') return lipatPanjang(e, 'mg mg-masuk', jam, `<span class="dari">dari ${esc(e.dari)}</span>${teksChat(e.teks)}`);
   if (e.j === 'kirim'){ const r = e.teks.split('\n')[0];
-    return `<details class="mk" ${jam}><summary>&rarr; <b>${esc(e.ke)}</b>: ${esc(r.length > 70 ? r.slice(0, 69) + '…' : r)}</summary><pre>${esc(e.teks)}</pre></details>`; }
+    return `<details class="mk" ${jam}><summary><span class="ke">${IK.teruskan} ${esc(e.ke)}</span><span class="r">${esc(r)}</span></summary><pre>${esc(e.teks)}</pre></details>`; }
   return `<div class="mx${e.j === 'galat' ? ' galat' : ''}" ${jam}>${esc(e.teks)}</div>`;
 }
 function barisRiwayat(x){
@@ -1404,7 +1611,7 @@ function barisRiwayat(x){
   if (x.j === 'claude') return `<div class="mg mg-master" ${jam}>${teksJawab(x.teks)}</div>`;
   if (x.j === 'masuk') return `<div class="mg mg-masuk" ${jam}><span class="dari">dari ${esc(x.dari)}</span>${teksChat(x.teks)}</div>`;
   if (x.j === 'kirim'){ const ke = /^uds:/.test(x.ke) ? 'balasan ke pengirim' : x.ke, r = x.teks.split('\n')[0];
-    return `<details class="mk" ${jam}><summary>&rarr; <b>${esc(ke)}</b>: ${esc(r.length > 70 ? r.slice(0, 69) + '…' : r)}</summary><pre>${esc(x.teks)}</pre></details>`; }
+    return `<details class="mk" ${jam}><summary><span class="ke">${IK.teruskan} ${esc(ke)}</span><span class="r">${esc(r)}</span></summary><pre>${esc(x.teks)}</pre></details>`; }
   if (x.j === 'alat') return `<div class="mx" ${jam}>alat: ${esc(x.nama.join(', '))}${x.n > 1 ? ` (${x.n}x)` : ''}</div>`;
   return '';
 }
@@ -1416,7 +1623,14 @@ function gambarTab(){
   bm.classList.toggle('baru', !!MCHAT.belumTab && MCHAT.lihat === 'riwayat');
   br.textContent = 'Riwayat ' + (MCHAT.tujuan || ''); br.title = `Percakapan sesi ${MCHAT.tujuan || ''} (baca saja)`;
 }
+MCHAT.jawab = {id: null, p: {}, teks: ''};
+function hitungTanyaAktif(){
+  const iT = MCHAT.ev.map(e => e.j === 'master' && RE_TANYA.test(e.teks)).lastIndexOf(true);
+  const ada = iT >= 0 && !MCHAT.ev.slice(iT + 1).some(e => e.j === 'kamu');
+  MCHAT.tanyaAktif = ada ? MCHAT.ev[iT].id : null;
+}
 function gambarChat(gulir){
+  hitungTanyaAktif();
   const log = $('mLog'), bawah = gulir || log.scrollHeight - log.scrollTop - log.clientHeight < 40;
   gambarTab();
   if (MCHAT.lihat === 'riwayat' && MCHAT.tujuan){
@@ -1430,9 +1644,13 @@ function gambarChat(gulir){
     return;
   }
   $('mDot').className = 'dot d-' + (MCHAT.status || 'mati');
-  $('mStatus').textContent = MCHAT.dimuat ? (STATUS_M[MCHAT.status] || MCHAT.status) : 'Server belum mendukung Chat Master';
+  $('mStatus').innerHTML = !MCHAT.dimuat ? 'Server belum mendukung Chat Master'
+    : MCHAT.status === 'sibuk' ? 'Master berpikir<span class="ketik"><i></i><i></i><i></i></span>' : esc(STATUS_M[MCHAT.status] || MCHAT.status);
   $('mStatus').title = MCHAT.galat || (MCHAT.status === 'mati' ? 'Menyala otomatis saat kamu mengirim pesan' : '');
+  const nBaru = MCHAT.idTampil == null ? 0 : MCHAT.ev.filter(e => e.id > MCHAT.idTampil).length;
   log.innerHTML = MCHAT.ev.length ? MCHAT.ev.map(barisChat).join('') : `<div class="mkosong">Master adalah koordinator: ia melihat sesi Claude yang aktif, meneruskan tugasmu ke sesi yang cocok, menunggu balasannya, lalu merangkum di sini.<br><br>Contoh: <i>sesi apa saja yang aktif?</i><br><br>Tindakan berisiko (upload, publish, hapus, push) tetap kamu konfirmasi langsung di sesi tujuan.</div>`;
+  if (nBaru > 0 && nBaru <= log.children.length) [...log.children].slice(-nBaru).forEach(c => c.classList.add('anim-masuk'));
+  if (MCHAT.ev.length) MCHAT.idTampil = Math.max(MCHAT.idTampil || 0, ...MCHAT.ev.map(e => e.id || 0));
   if (bawah) log.scrollTop = log.scrollHeight;
 }
 function tandaBelum(){ $('bMaster').classList.toggle('baru', MCHAT.belum); }
@@ -1446,7 +1664,8 @@ async function ambilChat(){
       if (j.akhir < MCHAT.akhir){ MCHAT.ev = []; MCHAT.akhir = 0; }  // riwayat server direset: muat ulang dari awal
       const baru = (j.ev || []).filter(e => e.id > MCHAT.akhir), berubah = baru.length || j.status !== MCHAT.status || j.galat !== MCHAT.galat || !MCHAT.dimuat;
       if (MCHAT.dimuat) for (const e of baru){
-        if (e.j === 'kirim') terbangkanKurir(e.ke);
+        if (e.j === 'kirim') lempar('tombak', leadMaster(), cariLead(e.ke));
+        if (e.j === 'masuk') lempar('panah', cariLead(e.dari), leadMaster());
         if (!MCHAT.buka && (e.j === 'master' || e.j === 'masuk')) MCHAT.belum = true;
         if (MCHAT.lihat === 'riwayat' && (e.j === 'master' || e.j === 'masuk')) MCHAT.belumTab = true;
       }
@@ -1518,10 +1737,28 @@ $('mForm').addEventListener('submit', async e => {
   MCHAT.mengirim = false; $('mKirim').disabled = false;
   ambilChat();
 });
+$('mLog').addEventListener('click', e => {
+  const l = e.target.closest('.mlebih');
+  if (l){ const id = +l.dataset.id; if (MCHAT.lengkap.has(id)) MCHAT.lengkap.delete(id); else MCHAT.lengkap.add(id);
+    const g = l.closest('.mg'); g.classList.toggle('lengkap', MCHAT.lengkap.has(id)); l.textContent = MCHAT.lengkap.has(id) ? 'Lipat' : 'Tampilkan semua'; return; }
+  const b = e.target.closest('.mop'); if (!b) return;
+  const id = +b.dataset.id, p = +b.dataset.p, n = +b.dataset.n, ta = $('mTeks');
+  if (MCHAT.jawab.id !== id) MCHAT.jawab = {id, p: {}, teks: ''};
+  if (MCHAT.jawab.p[p] === b.dataset.v) delete MCHAT.jawab.p[p]; else MCHAT.jawab.p[p] = b.dataset.v;
+  const ks = Object.keys(MCHAT.jawab.p).map(Number).sort((a, c) => a - c);
+  const baru = n === 1 ? (MCHAT.jawab.p[1] || '') : ks.map(k => `${k}. ${MCHAT.jawab.p[k]}`).join('\n');
+  // ganti hanya bagian yg tadi diisi otomatis; teks tambahan user di bawahnya tetap
+  const lama = MCHAT.jawab.teks, v = ta.value;
+  ta.value = !v.trim() || v === lama ? baru : (lama && v.startsWith(lama) ? baru + v.slice(lama.length) : baru + (baru ? '\n' : '') + v);
+  MCHAT.jawab.teks = baru; galatForm('');
+  gambarChat(false); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+});
 $('mTeks').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); $('mForm').requestSubmit(); } });
-$('mUlang').onclick = async () => { if (!confirm('Hentikan proses Master? Kiriman berikutnya melanjutkan percakapan yang sama.')) return;
+$('mMenuB').onclick = e => { e.stopPropagation(); $('mMenu').classList.toggle('buka'); };
+document.addEventListener('click', e => { if (!e.target.closest('#mMenu')) $('mMenu').classList.remove('buka'); });
+$('mUlang').onclick = async () => { $('mMenu').classList.remove('buka'); if (!confirm('Hentikan proses Master? Kiriman berikutnya melanjutkan percakapan yang sama.')) return;
   try { await postMaster('/api/master/ulang'); } catch (er) { galatChat('Gagal: ' + er.message); } ambilChat(); };
-$('mBaru').onclick = async () => { if (!confirm('Mulai percakapan baru? Master melupakan konteks percakapan lama (riwayat di panel tetap ada).')) return;
+$('mBaru').onclick = async () => { $('mMenu').classList.remove('buka'); if (!confirm('Mulai percakapan baru? Master melupakan konteks percakapan lama (riwayat di panel tetap ada).')) return;
   try { await postMaster('/api/master/baru'); } catch (er) { galatChat('Gagal: ' + er.message); } ambilChat(); };
 
 // sesi tujuan: chip dari /api/master/sesi (registry sesi Claude Code, nama = nama di ListAgents). Klik = pesan berikutnya
@@ -1530,7 +1767,7 @@ MCHAT.sesi = []; MCHAT.tujuan = '';
 function gambarSesi(){
   const el = $('mSesi');
   if (MCHAT.tujuan && !MCHAT.sesi.some(x => x.nama === MCHAT.tujuan)) MCHAT.tujuan = '';  // sesi tujuan sudah tutup
-  el.innerHTML = `<span class="lbl2">${MCHAT.tujuan ? 'Ke:' : 'Tujuan:'}</span>` + (MCHAT.sesi.length
+  el.innerHTML = `<span class="lbl2">${MCHAT.tujuan ? 'Ke' : 'Tujuan'}</span>` + (MCHAT.sesi.length
     ? MCHAT.sesi.map(x => `<button type="button" class="msc${x.nama === MCHAT.tujuan ? ' on' : ''}" data-nama="${esc(x.nama)}" title="${x.status === 'sibuk' ? 'Sedang kerja' : 'Siap'} - klik untuk ${x.nama === MCHAT.tujuan ? 'membatalkan' : 'mengirim pesan berikutnya ke sesi ini'}"><i class="${x.status}"></i>${esc(x.nama)}</button>`).join('')
     : '<span class="lbl2">tidak ada sesi lain yang aktif</span>')
     + (MCHAT.tujuan ? `<button type="button" class="batal" title="Biarkan Master yang memilih tujuan">&times; batal</button>` : '');
@@ -1648,8 +1885,8 @@ function gambarSaranUI(){
   const tAI = MCHAT.aiMatiServer ? 'Saran AI dimatikan di server (SARAN_MODEL = False)'
     : MCHAT.aiNyala ? `Saran AI nyala (Haiku). Klik untuk mematikan.${ai ? ` Saran ini: ${ai.cache ? 'dari cache, 0' : '$' + ai.biaya.toFixed(5)}; sejak server menyala: ${ai.jumlah ?? '-'} saran, $${(ai.total ?? 0).toFixed(4)}` : ''}`
     : 'Saran AI mati: pakai aturan sederhana (gratis). Klik untuk menyalakan.';
-  el.innerHTML = `<span class="lbl2">${label}</span>` + xs.map(x => `<button type="button" class="msr" title="Isi kotak ketik">${esc(x)}</button>`).join('')
-    + `<button type="button" class="msr-ai${MCHAT.aiNyala && !MCHAT.aiMatiServer ? ' on' : ''}" title="${esc(tAI)}">AI</button>`;
+  el.innerHTML = `<button type="button" class="msr-ai${MCHAT.aiNyala && !MCHAT.aiMatiServer ? ' on' : ''}" title="${esc(tAI)}">AI</button><span class="lbl2">${label.replace(/:$/, '')}</span>`
+    + xs.map(x => `<button type="button" class="msr" title="Isi kotak ketik">${esc(x)}</button>`).join('');
 }
 // ═════ PERLU JAWABAN ═════
 // /api/master/perlu tiap 8 dtk: sesi yg bertanya / mungkin menunggu izin. Klik item = buka Chat Master, pilih sesi itu
@@ -1664,10 +1901,10 @@ function gambarPerlu(){
   document.title = xs.length ? `(${xs.length}) ${PERLU.judul}` : PERLU.judul;
   if (!xs.length) return;
   el.querySelector('.jml').textContent = xs.length;
-  el.querySelector('.pdaf').innerHTML = xs.map(x => `<div class="pit" data-nama="${esc(x.nama)}" title="Buka sesi ${esc(x.nama)} di Chat Master">
+  el.querySelector('.pdaf').innerHTML = xs.map(x => `<div class="pit" data-nama="${esc(x.nama)}" title="${esc(x.nama)}: ${esc(x.teks)}&#10;(klik untuk membuka sesinya di Chat Master)">
     <span class="jn jn-${x.jenis}">${x.jenis === 'izin' ? 'izin?' : 'tanya'}</span>
     <span class="isi"><b>${esc(x.nama)}</b> <span class="w">${x.w ? jamChat(x.w) : ''}</span><span class="q">${esc(x.teks)}</span></span>
-    <button class="x" data-k="${esc(kunciPerlu(x))}" title="Sembunyikan sampai ada pertanyaan baru" aria-label="Sembunyikan">&times;</button></div>`).join('');
+    <button class="x" data-k="${esc(kunciPerlu(x))}" title="Sembunyikan sampai ada pertanyaan baru" aria-label="Sembunyikan">${IK.tutup}</button></div>`).join('');
 }
 async function ambilPerlu(){
   try { const r = await fetch('/api/master/perlu', {cache:'no-store'}); if (r.ok){ PERLU.item = (await r.json()).item || [];
@@ -1692,6 +1929,8 @@ $('mSaran').addEventListener('click', e => {
   const ta = $('mTeks'); ta.value = ta.value.trim() ? ta.value.replace(/\s*$/, ' ') + b.textContent : b.textContent; ta.focus(); });
 $('mTab').addEventListener('click', e => { const b = e.target.closest('button[data-v]'); if (!b) return;
   MCHAT.lihat = b.dataset.v; if (MCHAT.lihat === 'master') MCHAT.belumTab = false; else ambilRiwayat(); gambarChat(true); });
+for (const id of ['mSesi', 'mSaran']) $(id).addEventListener('wheel', e => { const el = $(id);
+  if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)){ el.scrollLeft += e.deltaY; e.preventDefault(); } }, {passive:false});
 $('mSesi').addEventListener('click', e => {
   if (e.target.closest('.batal')){ MCHAT.tujuan = ''; MCHAT.lihat = 'master'; gambarSesi(); gambarChat(true); gambarSaran(); return; }
   const b = e.target.closest('.msc'); if (!b) return;
@@ -1749,29 +1988,122 @@ try { const m = JSON.parse(localStorage.getItem(SIMPAN_M) || '{}');
   if (m.x != null && m.w > 0){ geoM = {x: m.x, y: m.y, w: m.w, h: m.h}; Object.assign(panelM.style, {left: m.x + 'px', top: m.y + 'px', width: m.w + 'px', height: m.h + 'px', right: 'auto', bottom: 'auto'}); }
   if (m.buka) bukaChat(true); } catch (e) {}
 
-// kurir: gulungan surat bersinar terbang lengkung dari Aula Guild ke sesi (Lead) tujuan tiap kali Master mengirim pesan
-const KURIR = [], geoKurir = new THREE.CylinderGeometry(0.16, 0.16, 0.7, 10), matKurir = emisif(0xffe7a0, 2.4), matTali = emisif(0xd8403a, 1.4);
-function terbangkanKurir(ke){
-  const nama = String(ke || '').trim().toLowerCase(); if (!nama) return;
-  const o = [...AGEN.values()].find(x => x.data && x.data.peran === 'Lead' && [x.data.judul_sesi, x.data.deskripsi].some(n => (n || '').trim().toLowerCase() === nama));
-  if (!o) return;  // sesi tujuan tidak ada di peta
-  const g = new THREE.Group(), gul = new THREE.Mesh(geoKurir, matKurir), tali = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.035, 6, 14), matTali);
-  gul.rotation.z = Math.PI/2; tali.rotation.y = Math.PI/2; g.add(gul, tali);
-  g.traverse(m => { m.userData.dinamis = true; }); g.scale.setScalar(0.01); scene.add(g);
-  KURIR.push({g, tali, o, t:0, dari:V(AREA.Aula.x, 3.2, AREA.Aula.z)});
+// lemparan antar karakter (ganti kurir surat): Master -> sesi = TOMBAK, sesi -> Master = ANAK PANAH.
+// Pelempar menghadap sasaran + ancang-ancang, proyektil terbang parabola & menghadap arah gerak, menancap miring di tanah
+// DEKAT KAKI sasaran (tidak mengenai badan), sasaran melompat kaget, proyektil memudar. Antre: maks 2 aktif, antre <= 6.
+// Mesh lemparan ditandai userData.dinamis (jebakan 11); tak ada lampu baru (jebakan 13).
+const LEMPAR = [], ANTRE_LEMPAR = [], LEMPAR_MAKS = 2;
+const matKayuT = mat(0x8a5a2e), matBesiT = new THREE.MeshStandardMaterial({color:0xcfd6dc, metalness:0.7, roughness:0.35, emissive:0x606870, emissiveIntensity:0.25});
+const matPita = mat(0xd8403a), matBulu = mat(0xf4ecd6);
+const SUMBU_Y = V(0, 1, 0);
+function cariLead(nama){
+  nama = String(nama || '').trim().toLowerCase(); if (!nama) return null;
+  return [...AGEN.values()].find(x => x.data && x.data.peran === 'Lead' && x.data.status !== 'selesai'
+    && [x.data.judul_sesi, x.data.deskripsi].some(n => (n || '').trim().toLowerCase() === nama)) || null;
 }
+const leadMaster = () => [...AGEN.values()].find(x => x.data && x.data.master === 'aktif') || null;
+function buatProyektil(jenis){
+  // dibangun sepanjang sumbu +Y lokal (ujung tajam di +Y), lalu diarahkan dengan quaternion
+  const g = new THREE.Group();
+  if (jenis === 'tombak'){
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.3, 6), matKayuT); g.add(b);
+    const m = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.42, 6), matBesiT); m.position.y = 1.35; g.add(m);
+    const p = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.02), matPita); p.position.set(0.1, 0.95, 0); g.add(p);
+  } else {
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.15, 5), matKayuT); g.add(b);
+    const m = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.2, 5), matBesiT); m.position.y = 0.66; g.add(m);
+    for (const r of [0, Math.PI/2]){ const f = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.012), r ? matPita : matBulu); f.position.y = -0.48; f.rotation.y = r; g.add(f); }
+  }
+  g.traverse(x => { x.castShadow = true; x.userData.dinamis = true; }); return g;
+}
+function buatBusur(){
+  const g = new THREE.Group(), b = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.035, 5, 14, Math.PI), matKayuT);
+  b.rotation.z = Math.PI/2; g.add(b);
+  const tali = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1.0, 3), matBulu); g.add(tali); g.userData.tali = tali;
+  g.traverse(x => { x.userData.dinamis = true; }); return g;
+}
+function lempar(jenis, dari, ke){
+  // dari / ke = objek karakter (AGEN) atau null; tanpa sasaran -> dilewati
+  if (!ke) return;
+  if (LEMPAR.length >= LEMPAR_MAKS){ if (ANTRE_LEMPAR.length < 6) ANTRE_LEMPAR.push([jenis, dari, ke]); return; }
+  const L = {jenis, dari, ke, t: 0, fase: 'ancang', pegang: null, proy: null};
+  if (dari && !dari.jalur.length){
+    dari.aksi = {jenis, t: 0};
+    if (jenis === 'tombak'){ L.pegang = buatProyektil('tombak'); L.pegang.position.set(-0.32, 2.05, -0.15); L.pegang.rotation.x = -1.1; }
+    else { L.pegang = buatBusur(); L.pegang.position.set(0.28, 1.45, 0.55); L.pegang.rotation.y = Math.PI/2; }
+    dari.s.g.add(L.pegang);
+  }
+  LEMPAR.push(L);
+}
+function asalLempar(L){ return L.dari ? L.dari.s.g.position.clone().add(V(0, 2.6, 0)) : V(AREA.Aula.x, 4, AREA.Aula.z); }
 HIDUP.push((t, dt) => {
-  for (let i = KURIR.length - 1; i >= 0; i--){
-    const k = KURIR[i]; k.t += dt / 2.5;
-    const tuju = k.o.s.g.position, u = Math.min(1, k.t), e = u < 0.5 ? 2*u*u : 1 - Math.pow(-2*u + 2, 2)/2;
-    const ke = V(tuju.x, tuju.y + 3.6, tuju.z), tinggi = 5 + k.dari.distanceTo(ke) * 0.18;
-    k.g.position.lerpVectors(k.dari, ke, e); k.g.position.y += Math.sin(e * Math.PI) * tinggi;
-    k.g.rotation.set(Math.sin(t*6)*0.25, t*3, Math.sin(t*4)*0.2);
-    const skala = k.t < 0.1 ? k.t/0.1 : k.t > 1 ? Math.max(0, 1 - (k.t - 1)/0.12) : 1;
-    k.g.scale.setScalar(Math.max(0.01, skala));
-    if (k.t > 1.12 || !AGEN.has(k.o.id)){ scene.remove(k.g); k.tali.geometry.dispose(); KURIR.splice(i, 1); }
+  for (let i = LEMPAR.length - 1; i >= 0; i--){
+    const L = LEMPAR[i]; L.t += dt;
+    const keAda = AGEN.has(L.ke.id) && L.ke.data, dariAda = L.dari && AGEN.has(L.dari.id);
+    if (L.fase === 'ancang'){
+      // menghadap sasaran, tali busur ditarik
+      if (dariAda && keAda){ const d = L.ke.s.g.position.clone().sub(L.dari.s.g.position); L.dari.yawPaksa = Math.atan2(d.x, d.z); }
+      if (L.pegang && L.pegang.userData.tali) L.pegang.userData.tali.position.z = -Math.min(1, L.t / 0.55) * 0.32;
+      if (L.t >= 0.6 || !dariAda){
+        if (L.pegang){ L.pegang.removeFromParent(); L.pegang = null; }
+        if (!keAda){ L.fase = 'selesai'; }
+        else {
+          L.fase = 'terbang'; L.t = 0; L.a = asalLempar(L);
+          const kp = L.ke.s.g.position, arah = L.a.clone().setY(0).sub(V(kp.x, 0, kp.z)); if (arah.lengthSq() < 1e-4) arah.set(1, 0, 0);
+          arah.normalize();
+          L.b = V(kp.x, 0, kp.z).addScaledVector(arah, 1.2).add(V((Math.random() - 0.5) * 0.6, 0, (Math.random() - 0.5) * 0.6));  // di depan kaki
+          const jarak = L.a.distanceTo(L.b); L.lama = Math.min(2.2, Math.max(0.7, jarak / 16)); L.tinggi = 2 + jarak * 0.22;
+          L.proy = buatProyektil(L.jenis); L.proy.position.copy(L.a); scene.add(L.proy);
+          if (L.dari) L.dari.aksi = {jenis: L.jenis, t: 0.6, lepas: true};
+        }
+      }
+    } else if (L.fase === 'terbang'){
+      const u = Math.min(1, L.t / L.lama), posU = x => L.a.clone().lerp(L.b, x).add(V(0, Math.sin(x * Math.PI) * L.tinggi * (1 - x * 0.15), 0));
+      const p = posU(u), dpn = posU(Math.min(1, u + 0.02)).sub(p);
+      L.proy.position.copy(p);
+      if (dpn.lengthSq() > 1e-6) L.proy.quaternion.setFromUnitVectors(SUMBU_Y, dpn.normalize());
+      if (u >= 1){
+        // menancap: ujung masuk sedikit ke tanah, condong searah lemparan
+        L.fase = 'menancap'; L.t = 0;
+        const arahT = L.b.clone().sub(L.a).setY(0).normalize(), cond = V(arahT.x, -1.6, arahT.z).normalize();
+        L.proy.quaternion.setFromUnitVectors(SUMBU_Y, cond);
+        L.proy.position.copy(L.b).add(cond.clone().multiplyScalar(L.jenis === 'tombak' ? -0.75 : -0.35));
+        if (keAda) L.ke.reaksiT = 0.7;
+      }
+    } else if (L.fase === 'menancap'){
+      if (L.t > 2.6){ const k = Math.max(0, 1 - (L.t - 2.6) / 0.6); L.proy.scale.setScalar(Math.max(0.01, k)); if (k <= 0) L.fase = 'selesai'; }
+    }
+    if (L.fase === 'selesai'){
+      if (L.pegang) L.pegang.removeFromParent();
+      if (L.proy){ scene.remove(L.proy); L.proy.traverse(x => x.geometry && x.geometry.dispose()); }
+      if (L.dari){ L.dari.yawPaksa = null; L.dari.aksi = null; }
+      LEMPAR.splice(i, 1);
+      const nx = ANTRE_LEMPAR.shift(); if (nx) lempar(...nx);
+    }
   }
 });
+// pose tambahan dipanggil di akhir pose(): ancang-ancang / lepas, dan kaget saat lemparan menancap di dekatnya
+function poseAksi(o, dt){
+  const s = o.s;
+  if (o.aksi && !o.jalur.length){
+    const A = o.aksi; A.t += dt; const k = Math.min(1, A.t / 0.6);
+    if (A.jenis === 'tombak'){
+      if (!A.lepas){ s.bahuK.rotation.x = -2.2 - k * 0.7; s.bahuK.rotation.z = 0.25; s.pinggul.rotation.y = -0.35 * k; s.bahuKi.rotation.x = -0.9 * k; }
+      else { const f = Math.min(1, (A.t - 0.6) / 0.35); s.bahuK.rotation.x = -2.9 + f * 2.4; s.pinggul.rotation.y = -0.35 + f * 0.6; s.pinggul.rotation.x = 0.15 * f; }
+    } else {
+      // memanah: lengan kiri lurus ke depan (busur), lengan kanan menarik tali
+      s.bahuKi.rotation.x = -1.55; s.bahuKi.rotation.z = -0.1;
+      s.bahuK.rotation.x = A.lepas ? -1.3 : -1.55 + k * 0.1; s.bahuK.rotation.z = A.lepas ? 0.5 : -0.6 * k;
+      s.pinggul.rotation.y = 0.25; s.leher.rotation.y = 0.2;
+    }
+  }
+  if (o.reaksiT > 0){
+    // kaget lucu: lompat kecil + tangan terangkat, condong menjauh
+    o.reaksiT -= dt; const r = Math.max(0, o.reaksiT) / 0.7, h = Math.sin((1 - r) * Math.PI);
+    s.pinggul.position.y += h * 0.32; s.leher.rotation.x = -0.35 * h; s.pinggul.rotation.x = -0.18 * h;
+    s.bahuK.rotation.x = -2.6 * h; s.bahuKi.rotation.x = -2.6 * h; s.bahuK.rotation.z = 0.5 * h; s.bahuKi.rotation.z = -0.5 * h;
+  }
+}
 
 // ═════ PEMAKAIAN PLAN ═════
 // /api/pakai = cache pemakaian plan Claude Code (batas sesi 5 jam, mingguan, per model, kredit ekstra), tiap 30 dtk.
@@ -2174,6 +2506,7 @@ function pose(o, dt){
   if (o.kedipT === undefined) o.kedipT = 1 + Math.random()*4;
   o.kedipT -= dt; if (o.kedipT < -0.13) o.kedipT = 2.5 + Math.random()*3.5;
   const tutup = anim === 'tidur' || o.kedipT < 0; for (const m of s.mata) m.scale.y = tutup ? 0.12 : 1;
+  if (o.aksi || o.reaksiT > 0) poseAksi(o, dt);  // lemparan tombak / panah dan reaksi kaget
 }
 
 function animLead(o, a){
@@ -2196,7 +2529,7 @@ function langkah(o, dt){
     if (L < LAJU*dt){ g.position.copy(tuju); o.jalur.shift(); if (!o.jalur.length){ const f=o.setelah; o.setelah=null; f && f(); } }
     else g.position.addScaledVector(d, LAJU*dt/L);
   } else {
-    const yaw = o.slot ? o.slot.yaw : HADAP; g.rotation.y = sudutLerp(g.rotation.y, yaw, Math.min(1, dt*6));
+    const yaw = o.yawPaksa != null ? o.yawPaksa : o.slot ? o.slot.yaw : HADAP; g.rotation.y = sudutLerp(g.rotation.y, yaw, Math.min(1, dt*(o.yawPaksa != null ? 10 : 6)));
     if (o.tunggu > 0){ o.tunggu -= dt; if (o.tunggu <= 0){ o.animPaksa = null; const f=o.lanjut; o.lanjut=null; f && f(); } }
   }
 }
@@ -2238,6 +2571,16 @@ async function ambil(){
 
 // ═════ UI: daftar & detail ═════
 // grup "Arsip 24 jam" di daftar agen bisa dilipat; pilihan diingat per browser
+// inisial 1-2 huruf utk segel kartu; aktivitas = baris kedua kartu (tool terakhir / tugas / kalimat terakhir)
+const inisial = t => { const w = String(t || '?').replace(/^\[[^\]]*\]\s*/, '').match(/[A-Za-z0-9]+/g) || ['?'];
+  return (w.length > 1 ? w[0][0] + w[1][0] : w[0].slice(0, 2)).toUpperCase(); };
+function aktivitasKartu(a){
+  const tool = (a.tool_akhir || '').replace(/^.*\./, '');
+  if (a.status === 'jalan') return [tool, a.detail_akhir].filter(Boolean).join(' · ') || 'sedang bekerja';
+  if (a.status === 'menunggu') return a.tugas_kini ? 'tugas: ' + a.tugas_kini.replace(/^\[via [^\]]*\]\s*/, '').replace(/^\(ke [^)]*\)\s*/, '').replace(/\s+/g, ' ') : 'menunggu balasanmu';
+  if (a.status === 'diam') return 'diam' + (tool ? ' · terakhir ' + tool : '');
+  return (a.teks_akhir || '').replace(/\s+/g, ' ');
+}
 let arsipSembunyi = false;
 try { arsipSembunyi = localStorage.getItem('desaArsip') === 'sembunyi'; } catch (e) {}
 function gambarDaftar(){
@@ -2246,19 +2589,24 @@ function gambarDaftar(){
   const pin = xs.find(a => a.master === 'aktif');  // Chat Master yg dipakai panel: selalu paling atas, apa pun statusnya
   for (const a of xs){ if (a === pin) continue; if (a.status==='jalan') grp.jalan.push(a); else if (a.status==='menunggu') grp.menunggu.push(a); else if (a.status==='diam') grp.diam.push(a); else if (now-a.akhir < SIMPAN_MENIT*60) grp.baru.push(a); else grp.arsip.push(a); }
   const item = (a, arsip) => { const lama = a.status==='jalan' ? now-a.mulai : a.durasi;
-    return `<div class="item${a.id===pilihId?' pilih':''}${arsip?' arsip':''}" data-id="${esc(a.id)}"><span class="dot d-${a.status}"></span>${pil(a.peran)}<span class="nm">${esc(a.deskripsi)}</span><span class="wkt">${dur(lama)}</span></div>`; };
+    // kartu: segel inisial (warna dari nama, cincin = status) + nama + aktivitas terakhir; lencana peran hanya subagen
+    const akt = aktivitasKartu(a);
+    return `<div class="item kartu${a.id===pilihId?' pilih':''}${arsip?' arsip':''}" data-id="${esc(a.id)}" title="${esc(a.deskripsi)}${akt ? ' - ' + esc(akt) : ''}"><span class="ava st-${a.status}" style="--h:${hashTeks(a.deskripsi || a.id) % 360}">${esc(inisial(a.deskripsi))}</span><span class="isiK"><span class="nm">${esc(a.deskripsi)}</span>${akt ? `<span class="akt">${esc(akt)}</span>` : ''}</span><span class="kananK"><span class="wkt">${dur(lama)}</span>${a.peran === 'Lead' ? '' : pil(a.peran)}</span></div>`; };
   // peringatan sumber data di atas daftar (bedakan dari "memang tak ada agen")
   const awas = DATA.peringatan ? `<div style="margin:8px 4px;padding:8px 10px;border-radius:8px;background:rgba(240,181,74,.28);color:#7a4a08;border:1px solid rgba(168,118,30,.5);font-size:12.5px">${esc(DATA.peringatan)}</div>` : '';
   const ST_TEKS = {jalan:'sedang kerja', menunggu:'menunggu', diam:'diam', selesai:'selesai'};
-  const itemPin = a => item(a).replace('class="item', 'class="item pin').replace('<span class="wkt">', `<span class="stTeks">${ST_TEKS[a.status] || a.status}</span><span class="wkt">`);
+  const itemPin = a => item(a).replace('class="item', 'class="item pin').replace('<span class="kananK">', `<span class="kananK"><span class="stTeks st-${a.status}">${ST_TEKS[a.status] || a.status}</span>`);
   $('daftar').innerHTML = awas + (pin ? `<div class="grp">Chat Master</div>` + itemPin(pin) : '') +
     (grp.jalan.length ? `<div class="grp">Sedang kerja (${grp.jalan.length})</div>`+grp.jalan.map(a=>item(a)).join('') : '<div class="grp">Sedang kerja (0)</div><div style="font-size:12.5px;color:var(--teks3);padding:2px 8px">Tidak ada agen yang kerja. Coba tombol Demo.</div>') +
     (grp.menunggu.length ? `<div class="grp">Menunggu balasanmu (${grp.menunggu.length})</div>`+grp.menunggu.map(a=>item(a)).join('') : '') +
     (grp.diam.length ? `<div class="grp">Tertidur / diam (${grp.diam.length})</div>`+grp.diam.map(a=>item(a)).join('') : '') +
     (grp.baru.length ? `<div class="grp">Baru selesai - di kedai (${grp.baru.length})</div>`+grp.baru.map(a=>item(a)).join('') : '') +
-    (grp.arsip.length ? `<div class="grp grpLipat" data-lipat="arsip" title="${arsipSembunyi ? 'Tampilkan' : 'Sembunyikan'} arsip">${arsipSembunyi ? '&#9656;' : '&#9662;'} Arsip 24 jam (${grp.arsip.length})<span class="mbtn">${arsipSembunyi ? 'Tampilkan' : 'Sembunyikan'}</span></div>`
+    (grp.arsip.length ? `<div class="grp grpLipat" data-lipat="arsip" title="${arsipSembunyi ? 'Tampilkan' : 'Sembunyikan'} arsip">${arsipSembunyi ? IK.kanan : IK.bawah} Arsip 24 jam (${grp.arsip.length})<span class="mbtn">${arsipSembunyi ? 'Tampilkan' : 'Sembunyikan'}</span></div>`
       + (arsipSembunyi ? '' : grp.arsip.map(a=>item(a,true)).join('')) : '');
-  $('ringkas').textContent = `${grp.jalan.length} kerja · ${grp.menunggu.length} menunggu · ${grp.diam.length} diam · ${grp.baru.length} di kedai · ${grp.arsip.length} arsip`;
+  // ringkasan = legenda warna status; angka 0 tidak ditampilkan
+  const rk = [['jalan', grp.jalan.length + (pin && pin.status === 'jalan' ? 1 : 0), 'kerja'], ['menunggu', grp.menunggu.length + (pin && pin.status === 'menunggu' ? 1 : 0), 'menunggu'],
+    ['diam', grp.diam.length, 'diam'], ['selesai', grp.baru.length + grp.arsip.length, 'selesai']].filter(x => x[1] > 0);
+  $('ringkas').innerHTML = rk.length ? rk.map(([st, n, t]) => `<span class="rk" title="${t}"><span class="dot d-${st}"></span>${n} ${t}</span>`).join('') : 'tidak ada sesi aktif';
 }
 // prompt & laporan tidak ikut di daftar ringkas -> ambil per agen saat dipilih (segar lagi tiap 15 dtk)
 const DETAIL = new Map();
