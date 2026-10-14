@@ -228,12 +228,27 @@ def baca_sesi(path):
         c = m.get('content')
         if tp == 'user':
             st['menunggu'] = False
+            o = j.get('origin')
+            if isinstance(o, dict) and o.get('kind') == 'peer' and \
+                    os.path.normcase(os.path.normpath(st['cwd'] or '.')) == os.path.normcase(MASTER_DIR):
+                continue  # utk Chat Master, pesan sesi lain = BALASAN, bukan tugas
+            if isinstance(o, dict) and o.get('kind') == 'peer':
+                # pesan dari sesi lain (mis. tugas diteruskan Chat Master) juga = tugas baru; baris pertama = ringkasannya
+                baris1 = next((b.strip() for b in str(o.get('body') or '').split('\n') if b.strip()), '')
+                if baris1:
+                    st['tugas'].append({'teks': f"[via {str(o.get('name') or 'sesi lain')[:40]}] {baris1}"[:800], 'mulai': t, 'tools': 0})
+                    st['tugas'] = st['tugas'][-30:]
+                continue
             if isinstance(c, list) and any(isinstance(x, dict) and x.get('type') == 'tool_result' for x in c):
                 continue
             teks = teks_isi(c).strip()
             if not teks or j.get('isMeta') or j.get('isCompactSummary') or teks.startswith('<') or teks.startswith(AWALAN_BUKAN_PROMPT):
                 continue
             teks = re.sub(r'<pasted_content[^>]*>.*?</pasted_content[^>]*>', '[tempelan]', teks, flags=re.S).strip()
+            # pesan dari panel Chat Master: "[Tujuan: X]" + baris lampiran -> ringkas
+            teks = re.sub(r'^\[Tujuan: ([^\]\n]{1,80})\]\s*', r'(ke \1) ', teks)
+            teks = re.sub(r'\s*\[Lampiran gambar: [^\]\n]+\]', ' [gambar]', teks)
+            teks = re.sub(r'\s*\(Buka dengan Read\. Kalau diteruskan[^)]*\)', '', teks).strip()
             st['tugas'].append({'teks': teks[:800], 'mulai': t, 'tools': 0})
             st['tugas'] = st['tugas'][-30:]
         elif tp == 'assistant':
@@ -820,8 +835,13 @@ MASTER_SISTEM = (
     '~/.claude/catatan-bersama.md untuk tahu apa yang sedang dikerjakan tiap sesi), teruskan tugas lewat SendMessage, '
     'tunggu balasan (balasan sesi lain masuk sebagai pesan baru), lalu rangkum ke user. '
     'Kamu TIDAK mengerjakan tugas sendiri: tidak mengedit file, tidak menjalankan perintah. '
-    'Aturan: (1) Kalau sesi tujuan tidak jelas atau ada beberapa kandidat, tanya user dulu. '
-    '(2) Pesan ke sesi: baris pertama ringkasan yang jelas, lalu konteks lengkap; sebut bahwa ini diteruskan dari user '
+    'Aturan: (1) RAPIKAN dulu permintaan user sebelum diteruskan. Kalau sesi tujuan, maksud, atau hasil yang diinginkan '
+    'belum jelas (misalnya "ubah a jadi b" tanpa tahu a yang mana, atau kriteria selesainya tidak jelas), JANGAN '
+    'teruskan dulu: tanya user. Tulis pertanyaanmu di bawah baris persis "**Perlu kamu jawab:**", lalu daftar bernomor, '
+    'satu pertanyaan per baris, singkat, dan kalau bisa sertakan pilihan jawabannya. Panel desa menyorot blok ini. '
+    '(2) Pesan ke sesi (SendMessage) berisi, berurutan: (a) baris pertama ringkasan satu kalimat yang jelas; '
+    '(b) "Kata user:" lalu kutipan asli user; (c) versi yang sudah diperjelas: apa yang diubah, dari apa menjadi apa, '
+    'dan kriteria selesai; (d) tafsiran atau asumsi yang kamu buat (kalau ada). Sebut bahwa ini diteruskan dari user '
     'lewat Chat Master desa. (3) Kamu tidak bisa memberi izin atas nama user: tindakan berisiko (upload, publish, hapus, '
     'kirim pesan keluar, push) tetap harus dikonfirmasi user langsung di sesi tujuan; sampaikan itu ke user bila relevan. '
     '(4) Saat meneruskan balasan sesi ke user, awali dengan "[dari <nama sesi>]". (5) Jawab ringkas dalam bahasa '
@@ -829,8 +849,9 @@ MASTER_SISTEM = (
     '(baris "[Lampiran gambar: ...]"). Kamu boleh membukanya dengan Read untuk memahami isinya. Kalau tugas itu diteruskan '
     'ke sesi lain, SELALU sertakan jalur absolut tiap gambar apa adanya di pesan SendMessage dan minta sesi tujuan '
     'membukanya dengan Read, karena SendMessage hanya bisa mengirim teks. (7) Kalau pesan user diawali baris '
-    '"[Tujuan: <nama sesi>]", user sudah memilih sesi tujuannya dari panel: teruskan isi pesan itu ke sesi tersebut '
-    '(SendMessage to = nama itu) tanpa menanyakan tujuan lagi, kecuali pesannya jelas pertanyaan untukmu sendiri.'
+    '"[Tujuan: <nama sesi>]", baris itu HANYA menentukan TUJUAN (jangan tanya tujuan lagi; SendMessage to = nama itu). '
+    'Isinya tetap kamu rapikan sesuai aturan (2), dan kalau maksudnya ambigu tetap tanya dulu sesuai aturan (1). '
+    'Kalau pesannya jelas pertanyaan untukmu sendiri, jawab sendiri tanpa meneruskan.'
 )
 
 
@@ -1035,6 +1056,81 @@ def api_perlu():
                                 'mungkin menunggu izin di sesi itu'})
     out.sort(key=lambda y: -(y['w'] or 0))
     return out
+
+
+# Saran balasan pakai model (Haiku): konteks DIBANGUN SERVER (pesan terakhir panel Master + ekor riwayat sesi tujuan),
+# jadi klien tak bisa menyuntikkan teks. POST ber-token (bukan GET: situs lain bisa memicu GET lewat <img> dan menguras
+# kuota). Haiku tanpa alat / MCP / transkrip, system prompt pendek -> terukur ~0,0002 USD pertama, ~0,00004 berikutnya.
+# Cache per konteks, satu panggilan sekaligus, timeout. SARAN_MODEL = False -> klien pakai saran berbasis aturan.
+SARAN_MODEL = True
+SARAN_DIR = os.path.join(CLAUDE_DIR, 'desa-master', 'Saran')
+SARAN_SISTEM = ('Kamu pembuat saran balasan singkat untuk panel chat. Jawab HANYA dengan JSON array string, '
+                'tanpa teks lain.')
+_saran = {'cache': {}, 'kunci': threading.Lock(), 'biaya': 0.0, 'jumlah': 0}
+
+
+def konteks_saran(nama):
+    baris = []
+    with MASTER.kunci:
+        ev = [e for e in MASTER.ev if e.get('j') in ('kamu', 'master', 'masuk')][-6:]
+    for e in ev:
+        siapa = {'kamu': 'user', 'master': 'Chat Master', 'masuk': f"sesi {e.get('dari', '?')}"}[e['j']]
+        jam = datetime.fromtimestamp(e['w']).strftime('%H:%M') if e.get('w') else '--:--'
+        baris.append(f"[{jam}] {siapa}: {' '.join(str(e.get('teks', '')).split())[:600]}")
+    if nama:
+        d = api_riwayat_sesi(nama)
+        if d and d.get('item'):
+            baris.append(f'--- percakapan terakhir sesi {nama} ---')
+            for x in [x for x in d['item'] if x['j'] in ('user', 'claude', 'masuk')][-6:]:
+                siapa = {'user': 'user', 'claude': f'asisten {nama}', 'masuk': f"pesan dari {x.get('dari', '?')}"}[x['j']]
+                jam = datetime.fromtimestamp(x['w']).strftime('%H:%M') if x.get('w') else '--:--'
+                baris.append(f"[{jam}] {siapa}: {' '.join(x['teks'].split())[-700:]}")
+    return '\n'.join(baris)
+
+
+def api_saran(nama):
+    if not SARAN_MODEL:
+        return {'mati': True}
+    konteks = konteks_saran(nama)
+    if not konteks.strip():
+        return {'saran': []}
+    kunci = (nama, konteks)
+    if kunci in _saran['cache']:
+        return {**_saran['cache'][kunci], 'cache': True}
+    if not _saran['kunci'].acquire(blocking=False):
+        return {'sibuk': True}  # ada panggilan lain berjalan: klien pakai saran aturan dulu
+    try:
+        exe = cari_claude()
+        if not exe:
+            return {'galat': 'CLI claude tidak ditemukan'}
+        os.makedirs(SARAN_DIR, exist_ok=True)
+        prompt = (f'Percakapan terakhir yang sedang dilihat user{" (tujuan pesan: sesi " + nama + ")" if nama else ""}:\n'
+                  f'{konteks}\n\nTulis 2-4 saran balasan singkat yang paling mungkin user kirim berikutnya, sesuai pesan '
+                  'dengan jam PALING AKHIR (abaikan topik lama). '
+                  + (f'User sedang memilih sesi {nama} sebagai tujuan, jadi utamakan balasan untuk sesi itu. ' if nama else '')
+                  + 'Bahasa Indonesia santai, maksimal 40 karakter per saran, tanpa emoji. '
+                  'Jawab HANYA dengan JSON array string.')
+        cmd = [exe, '-p', '--model', 'haiku', '--tools', '', '--strict-mcp-config', '--no-session-persistence',
+               '--disable-slash-commands', '--system-prompt', SARAN_SISTEM, '--output-format', 'json']
+        env = {k: v for k, v in os.environ.items() if k not in ('CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT')}
+        r = subprocess.run(cmd, cwd=SARAN_DIR, input=prompt, capture_output=True, text=True, encoding='utf-8',
+                           errors='replace', timeout=25, env=env, creationflags=0x08000000 if os.name == 'nt' else 0)
+        d = json.loads(r.stdout)
+        biaya = float(d.get('total_cost_usd') or 0)
+        _saran['biaya'] += biaya
+        _saran['jumlah'] += 1
+        m = re.search(r'\[.*\]', str(d.get('result') or ''), re.S)
+        xs = json.loads(m.group(0)) if m else []
+        xs = [' '.join(str(x).split())[:60] for x in xs if isinstance(x, (str, int, float)) and str(x).strip()][:4]
+        hasil = {'saran': xs, 'biaya': round(biaya, 6)}
+        if len(_saran['cache']) > 60:
+            _saran['cache'].clear()
+        _saran['cache'][kunci] = hasil
+        return hasil
+    except (subprocess.TimeoutExpired, ValueError, OSError) as e:
+        return {'galat': str(e)[:200]}
+    finally:
+        _saran['kunci'].release()
 
 
 def cari_claude():
@@ -1380,6 +1476,12 @@ class H(BaseHTTPRequestHandler):
                 return
             ok = MASTER.kirim(teks, gambar, tujuan)
             self.kirim(200 if ok else 500, 'application/json', json.dumps({'ok': ok, 'galat': '' if ok else MASTER.galat}))
+        elif jalur == '/api/master/saran':  # saran balasan pakai Haiku (memakai kuota -> wajib token)
+            nama = body.get('nama') or ''
+            if nama and (not isinstance(nama, str) or nama not in [x['nama'] for x in sesi_tujuan()]):
+                nama = ''
+            d = dict(api_saran(nama), total=round(_saran['biaya'], 5), jumlah=_saran['jumlah'])  # biaya sejak server menyala
+            self.kirim(200, 'application/json', json.dumps(d))
         elif jalur in ('/api/master/ulang', '/api/master/baru'):
             MASTER.henti(lupakan=jalur.endswith('baru'))
             self.kirim(200, 'application/json', json.dumps({'ok': True}))
