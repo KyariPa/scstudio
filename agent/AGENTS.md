@@ -1,5 +1,7 @@
 # AGENTS.md: panduan untuk AI yang bekerja di `agent/`
 
+> **Aturan user untuk semua sesi:** baca [`ATURAN_DESA.md`](ATURAN_DESA.md). Semua pertanyaan, laporan, dan pilihan untuk user dikirim **lewat Chat Master**, bukan langsung; pengecualiannya urgent dan persetujuan tindakan berisiko. File itu juga dimuat ke prompt sistem Chat Master (`sistem_master()`).
+
 Dokumen ini untuk asisten AI (Claude Code, sesi cloud, atau agen lain) yang akan memakai, memasang, atau mengubah Dashboard Agen dan Desa Agen. Baca sampai habis sebelum mengubah kode. Penjelasan untuk manusia ada di `README.md`.
 
 ---
@@ -45,6 +47,7 @@ agent/
 ├─ qa.contoh.json      contoh konfigurasi katalog QA
 ├─ README.md           dokumentasi untuk manusia
 ├─ AGENTS.md           dokumen ini
+├─ ATURAN_DESA.md      aturan user untuk semua sesi (komunikasi lewat Chat Master); dimuat ke prompt Master
 ├─ CLAUDE.md           mengimpor AGENTS.md (dibaca otomatis oleh Claude Code)
 └─ .gitignore          qa.json, *.jsonl, __pycache__
 ```

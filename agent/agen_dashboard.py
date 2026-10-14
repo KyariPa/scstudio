@@ -829,6 +829,18 @@ def simpan_lampiran(isi):
         f.write(isi)
     bersihkan_lampiran()
     return nama
+MASTER_ATURAN = os.path.join(DIR, 'ATURAN_DESA.md')  # aturan user utk semua sesi; ikut repo (portabel antar komputer)
+
+
+def sistem_master():
+    # prompt sistem Master = MASTER_SISTEM + isi ATURAN_DESA.md (dibaca tiap Master menyala, jadi edit file cukup)
+    try:
+        aturan = open(MASTER_ATURAN, encoding='utf-8').read().strip()
+    except OSError:
+        aturan = ''
+    return MASTER_SISTEM + (f'\n\nATURAN DESA (dari agent/ATURAN_DESA.md, wajib diikuti):\n{aturan}' if aturan else '')
+
+
 MASTER_SISTEM = (
     'Kamu CHAT MASTER di Desa Agen milik user. User mengetik ke kamu dari panel chat di browser desa. '
     'Tugasmu KOORDINASI: pahami permintaan user, tentukan sesi Claude mana yang cocok (lihat dengan ListAgents; baca '
@@ -851,7 +863,12 @@ MASTER_SISTEM = (
     'membukanya dengan Read, karena SendMessage hanya bisa mengirim teks. (7) Kalau pesan user diawali baris '
     '"[Tujuan: <nama sesi>]", baris itu HANYA menentukan TUJUAN (jangan tanya tujuan lagi; SendMessage to = nama itu). '
     'Isinya tetap kamu rapikan sesuai aturan (2), dan kalau maksudnya ambigu tetap tanya dulu sesuai aturan (1). '
-    'Kalau pesannya jelas pertanyaan untukmu sendiri, jawab sendiri tanpa meneruskan.'
+    'Kalau pesannya jelas pertanyaan untukmu sendiri, jawab sendiri tanpa meneruskan. '
+    '(8) Kamu SATU-SATUNYA jalur antara sesi lain dan user: sesi lain mengirim pertanyaan, laporan, dan pilihan '
+    'kepadamu, bukan langsung ke user. Teruskan ke user dengan awalan "[dari <nama sesi>]"; kalau sesi butuh jawaban, '
+    'tulis pertanyaannya di blok "**Perlu kamu jawab:**". Begitu user menjawab, teruskan jawabannya kembali ke sesi '
+    'itu (SendMessage to = sesi asal) dengan format aturan (2). Pengecualian: persetujuan tindakan berisiko dan '
+    'permission prompt tetap diberikan user langsung di sesi tujuan; ingatkan user untuk membuka sesi itu.'
 )
 
 
@@ -1208,7 +1225,7 @@ class Master:
         os.makedirs(MASTER_DIR, exist_ok=True)
         cmd = [exe, '-p', '--input-format', 'stream-json', '--output-format', 'stream-json', '--verbose',
                '--strict-mcp-config', '--allowedTools', *MASTER_ALAT, '--disallowedTools', *MASTER_LARANG,
-               '--append-system-prompt', MASTER_SISTEM]
+               '--append-system-prompt', sistem_master()]
         if self.sesi:
             cmd += ['--resume', self.sesi]
         env = {k: v for k, v in os.environ.items() if k not in ('CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT')}
