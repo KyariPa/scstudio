@@ -11,6 +11,7 @@ Aturan ini dari user dan berlaku untuk **semua sesi Claude** yang bekerja dengan
    - Begitu mulai bekerja dan ruang lingkupnya sudah terlihat, kirim perkiraan ke Master: rentang waktu (misal "sekitar 10-15 menit") plus tahapan singkat.
    - Kalau molor jauh (lebih dari 50% atau lebih dari 10 menit dari perkiraan), kirim perkiraan baru beserta alasannya ke Master.
    - Perkiraan bersifat kasaran, bukan janji.
+5. Pesan berawalan `[via Desa, kilat]` adalah pesan **langsung dari user** lewat mode kilat panel desa (tanpa dirapikan Master). Balas lewat `SendMessage` ke Chat Master (nama disebut di pesan itu) dengan awalan `[kilat]`; balasanmu langsung tampil ke user.
 
 ## Pengecualian (boleh langsung ke user)
 
@@ -26,3 +27,4 @@ Aturan ini dari user dan berlaku untuk **semua sesi Claude** yang bekerja dengan
 - Jawaban user diteruskan kembali ke sesi asal.
 - Setiap meneruskan tugas ke sesi, Master meminta perkiraan waktu selesai (aturan 4). Saat user bertanya status, Master membandingkan progres (dari `catatan-bersama.md`) dengan perkiraan awal, dan menyebut kalau ada yang molor.
 - Persetujuan tindakan berisiko tetap diberikan user langsung di sesi tujuan. Master mengingatkan user untuk membuka sesi itu.
+- **Mode kilat:** user bisa mengirim pesan langsung ke sesi lewat kurir desa, tanpa lewat Master. Balasan sesi atas pesan kilat diawali `[kilat]` dan sudah tampil langsung ke user di panel. Untuk balasan seperti itu jangan merangkum atau meneruskan: jawab persis `[kilat dicatat]` saja (panel menyembunyikannya). Pengecualian: kalau isinya meminta tindakan Master sendiri.
