@@ -285,6 +285,32 @@ def baca_sesi(path):
     return st
 
 
+_induk_fork = {}  # path transkrip -> sessionId induk (None kalau bukan fork)
+
+
+def induk_fork(path, sid):
+    # sesi fork (Desktop "fork" / sesi anak) memulai transkripnya dengan salinan riwayat induk: sessionId di baris
+    # pertama = sessionId INDUK, bukan nama file. Dipakai /kantor untuk ruangan tim (induk = kepala ruangan).
+    if path in _induk_fork:
+        return _induk_fork[path]
+    induk = None
+    try:
+        with open(path, 'rb') as f:
+            for baris in f.read(16384).split(b'\n')[:6]:
+                try:
+                    d = json.loads(baris)
+                except Exception:
+                    continue
+                x = d.get('sessionId')
+                if isinstance(x, str) and x and x != sid:
+                    induk = x
+                break
+    except OSError:
+        return None
+    _induk_fork[path] = induk
+    return induk
+
+
 def kumpulkan_sesi(batas, sekarang):
     out = []
     # (user 15-10 "biar cuma yg hidup"): sesi yang prosesnya TIDAK hidup (registry_hidup) langsung "selesai", walau
@@ -307,7 +333,9 @@ def kumpulkan_sesi(batas, sekarang):
         sid = os.path.basename(path)[:-6]
         akhir = st['akhir'] or mt
         idle = sekarang - max(akhir, mt)
-        if idle > SESI_PULANG_MENIT * 60 or (sid_hidup is not None and sid not in sid_hidup):
+        # hidup/mati ditentukan registry: sesi HIDUP tidak pernah 'selesai' walau lama sepi (tetap menunggu/diam);
+        # sesi MATI selalu 'selesai'. Tanpa registry: aturan lama (sepi > SESI_PULANG_MENIT).
+        if (sid not in sid_hidup) if sid_hidup is not None else idle > SESI_PULANG_MENIT * 60:
             status = 'selesai'
         elif st['menunggu']:
             status = 'menunggu'
@@ -331,7 +359,7 @@ def kumpulkan_sesi(batas, sekarang):
             'tools': tg['tools'] if tg else 0, 'tool_akhir': st['tool_akhir'], 'detail_akhir': st['detail_akhir'],
             'teks_akhir': st['teks_akhir'], 'prompt': tg['teks'] if tg else '', 'laporan': '',
             'tugas_kini': tg['teks'][:300] if tg else '', 'tugas': list(reversed(riwayat))[:15],
-            'sesi': sid[:8], 'judul_sesi': judul, 'proyek': st['cwd'], 'sesi_mulai': st['sesi_mulai'],
+            'sesi': sid[:8], 'judul_sesi': judul, 'proyek': st['cwd'], 'sesi_mulai': st['sesi_mulai'], 'induk': induk_fork(path, sid),
             'model': st['model'], 'token_keluar': 0, 'kunci': 'Lead:', 'jejak': list(st['jejak']),
             **({'master': 'lama'} if is_master else {}),
         })
@@ -401,7 +429,7 @@ def kumpulkan(jam):
                 'mulai': mulai, 'akhir': akhir, 'durasi': (akhir if status != 'jalan' else sekarang) - mulai,
                 'idle': idle, 'tools': st['tools'], 'tool_akhir': st['tool_akhir'], 'detail_akhir': st['detail_akhir'],
                 'teks_akhir': st['teks_akhir'], 'prompt': st['prompt'][:1500], 'laporan': st['laporan'],
-                'sesi': os.path.basename(dir_sesi)[:8], 'judul_sesi': judul_sesi(dir_sesi),
+                'sesi': os.path.basename(dir_sesi)[:8], 'judul_sesi': judul_sesi(dir_sesi), 'induk': bagian[1] if len(bagian) > 1 else None,
                 'model': st['model'], 'token_keluar': st['token_keluar'], 'kunci': peran + ':' + kunci_jenis(desk),
             })
         sesi = kumpulkan_sesi(batas, sekarang)
@@ -980,6 +1008,81 @@ def registry_hidup():
     return out
 
 
+# ── BANGUNIN: buka lagi sesi Lead yang MATI di Claude Desktop ──
+# Desktop membuka sesi lewat tautan claude://claude.ai/epitaxy/local_<sessionId> (sessionId = nama file transkrip).
+# `claude --desktop --resume <id>` TIDAK bisa dipakai dari server: ia menolak berjalan tanpa terminal (output dialihkan).
+# Sesudah dibuka, proses sesi itu terdaftar di registry dalam beberapa detik (uji 15-10: 7 dtk) dan langsung bisa
+# menerima SendMessage, tanpa pesan pertama. Pengaman: hanya sessionId Lead dari transkrip 24 jam yang sedang MATI
+# (bukan Chat Master), pola UUID, jeda BANGUN_JEDA per sesi, endpoint POST ber-token (lihat do_POST).
+BANGUN_JEDA = 30
+BANGUN_TUNGGU = 60
+_bangun = {}  # sid -> {'nama', 'mulai', 'status': 'membangunkan' | 'hidup' | 'gagal', 'pesan'}
+_bangun_kunci = threading.Lock()
+RE_SID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+
+
+def sesi_bisa_bangun():
+    # sesi Lead mati (24 jam), bukan Chat Master; nama yang sedang hidup dilewati (transkrip lama bernama sama),
+    # dan per nama hanya transkrip TERBARU (sesi yang sama bisa punya beberapa transkrip)
+    reg = registry_hidup()
+    hidup, nama_hidup = {x['sid'] for x in reg if x['sid']}, {x['nama'] for x in reg}
+    terbaru = {}
+    for a in kumpulkan(24)['agen']:
+        if a.get('jenis') != 'sesi' or a.get('master') or not a['id'].startswith('sesi-') or a['id'][5:] in hidup or a['deskripsi'] in nama_hidup:
+            continue
+        if a['deskripsi'] not in terbaru or (a['akhir'] or 0) > (terbaru[a['deskripsi']]['akhir'] or 0):
+            terbaru[a['deskripsi']] = a
+    return {a['id'][5:]: a['deskripsi'] for a in terbaru.values()}
+
+
+def _buka_desktop(sid):
+    url = 'claude://claude.ai/epitaxy/local_' + sid  # sid sudah lolos RE_SID: tidak ada karakter lain yang bisa disisipkan
+    if hasattr(os, 'startfile'):
+        os.startfile(url)  # Windows: handler protokol claude:// (aplikasi Claude Desktop)
+    else:
+        subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def _pantau_bangun(sid):
+    batas = time.time() + BANGUN_TUNGGU
+    while time.time() < batas:
+        time.sleep(2)
+        _sesi_tujuan['waktu'] = 0  # paksa baca ulang registry
+        if any(x['sid'] == sid for x in registry_hidup()):
+            with _bangun_kunci:
+                _bangun[sid].update(status='hidup', pesan='sesi sudah hidup')
+            return
+    with _bangun_kunci:
+        _bangun[sid].update(status='gagal', pesan=f'belum muncul di registry setelah {BANGUN_TUNGGU} dtk - buka sesinya di Claude Desktop')
+
+
+def bangun_sesi(sid):
+    if not isinstance(sid, str) or not RE_SID.match(sid):
+        return 400, {'error': 'id sesi tidak valid'}
+    boleh = sesi_bisa_bangun()
+    if sid not in boleh:
+        return 409, {'error': 'sesi tidak ada di daftar 24 jam, sudah hidup, atau Chat Master'}
+    with _bangun_kunci:
+        lama = _bangun.get(sid)
+        if lama and time.time() - lama['mulai'] < BANGUN_JEDA:
+            return 429, {'error': f'tunggu {int(BANGUN_JEDA - (time.time() - lama["mulai"]))} dtk sebelum membangunkan sesi ini lagi'}
+        _bangun[sid] = {'nama': boleh[sid], 'mulai': time.time(), 'status': 'membangunkan', 'pesan': 'membuka sesi di Claude Desktop'}
+    try:
+        _buka_desktop(sid)
+    except Exception as e:
+        with _bangun_kunci:
+            _bangun[sid].update(status='gagal', pesan=f'gagal membuka Claude Desktop: {e}')
+        return 500, {'error': str(e)}
+    threading.Thread(target=_pantau_bangun, args=(sid,), daemon=True).start()
+    return 200, {'ok': True, 'nama': boleh[sid]}
+
+
+def api_bangun():
+    with _bangun_kunci:
+        return {'sesi': {sid: {'nama': b['nama'], 'status': b['status'], 'pesan': b['pesan'], 'mulai': b['mulai']}
+                         for sid, b in _bangun.items() if time.time() - b['mulai'] < 600}}
+
+
 def sesi_tujuan():
     per_nama = {}
     for x in registry_hidup():
@@ -1192,6 +1295,121 @@ def api_saran(nama):
         return {'galat': str(e)[:200]}
     finally:
         _saran['kunci'].release()
+
+
+# ── Ringkasan gelembung /kantor (Haiku): satu kalimat santai "apa yang sedang dikerjakan" per sesi Lead ──
+# Diminta halaman lewat POST /api/ringkas (ber-token, karena memakai kuota; GET bisa dipicu situs lain lewat <img>).
+# Hemat: hanya sesi Lead yang kerja / menunggu jawaban user (bukan Chat Master, bukan fork yang sudah menyerahkan hasil),
+# dibuat ulang hanya kalau tanda aktivitasnya berubah, paling sering sekali per RINGKAS_JEDA detik per sesi, satu panggilan
+# sekaligus (antrean + 1 thread pekerja). Gagal / lambat = klien memakai teks gelembung aturan seperti biasa.
+RINGKAS_MODEL = True
+RINGKAS_JEDA = 90
+RINGKAS_DIR = os.path.join(CLAUDE_DIR, 'desa-master', 'Ringkas')
+RINGKAS_SISTEM = ('Kamu menulis teks gelembung chat di atas kepala karakter di game kantor. Dari data aktivitas satu sesi kerja AI, '
+                  'tulis SATU kalimat bahasa Indonesia santai, 5 sampai 10 kata, tentang apa yang sedang dikerjakan sesi itu sekarang. '
+                  'Mulai dengan "Lagi" kalau statusnya sedang kerja, atau "Nunggu jawabanmu soal" kalau statusnya menunggu jawaban user. '
+                  'Pakai kata sederhana sehari-hari, boleh istilah teknis pendek. Tanpa emoji, tanpa tanda kutip, tanpa path atau nama '
+                  'file panjang, tanpa kata "saya", tanpa titik di akhir. Jawab HANYA kalimatnya.')
+_ringkas = {'cache': {}, 'antre': [], 'akhir': {}, 'kunci': threading.Lock(), 'ada': threading.Event(), 'pekerja': None,
+            'biaya': 0.0, 'jumlah': 0, 'gagal': 0}
+
+
+def tanda_ringkas(a):
+    import hashlib
+    x = '|'.join([a.get('status') or '', (a.get('tugas_kini') or '')[:300], a.get('tool_akhir') or '',
+                  (a.get('detail_akhir') or '')[:80], (a.get('teks_akhir') or '')[:200]])
+    return hashlib.sha1(x.encode('utf-8', 'replace')).hexdigest()[:16]
+
+
+def prompt_ringkas(a):
+    jejak = '\n'.join('- ' + str(j)[:120] for j in (a.get('jejak') or [])[-4:])
+    return (f"Judul sesi: {a.get('deskripsi') or '-'}\n"
+            + ('Jenis: fork (anak buah dari sesi lain)\n' if a.get('induk') else '')
+            + f"Status: {'sedang kerja' if a.get('status') == 'jalan' else 'menunggu jawaban user'}\n"
+            f"Tugas terakhir dari user: {(a.get('tugas_kini') or '-')[:400]}\n"
+            f"Langkah kerja terakhir:\n{jejak or '-'}\n"
+            f"Kalimat terakhir AI: {(a.get('teks_akhir') or '-')[:400]}\n\nTulis kalimat gelembungnya.")
+
+
+def bersih_ringkas(t):
+    t = ' '.join(str(t or '').split()).strip().strip('"\'`').strip('\u201c\u201d\u2018\u2019').rstrip('.!').strip()
+    t = re.sub(r'[\U0001F000-\U0001FFFF\u2600-\u27BF\uFE0F]', '', t).strip()
+    return t[:90]
+
+
+def panggil_ringkas(prompt):
+    exe = cari_claude()
+    if not exe:
+        return None
+    try:
+        os.makedirs(RINGKAS_DIR, exist_ok=True)
+        cmd = [exe, '-p', '--model', 'haiku', '--tools', '', '--strict-mcp-config', '--no-session-persistence',
+               '--disable-slash-commands', '--system-prompt', RINGKAS_SISTEM, '--output-format', 'json']
+        env = {k: v for k, v in os.environ.items() if k not in ('CLAUDECODE', 'CLAUDE_CODE_ENTRYPOINT')}
+        r = subprocess.run(cmd, cwd=RINGKAS_DIR, input=prompt, capture_output=True, text=True, encoding='utf-8',
+                           errors='replace', timeout=25, env=env, creationflags=0x08000000 if os.name == 'nt' else 0)
+        d = json.loads(r.stdout)
+        _ringkas['biaya'] += float(d.get('total_cost_usd') or 0)
+        _ringkas['jumlah'] += 1
+        t = bersih_ringkas(d.get('result'))
+        return t if len(t.split()) >= 2 else None
+    except (subprocess.TimeoutExpired, ValueError, OSError):
+        return None
+
+
+def pekerja_ringkas():
+    while True:
+        _ringkas['ada'].wait()
+        with _ringkas['kunci']:
+            if not _ringkas['antre']:
+                _ringkas['ada'].clear()
+                continue
+            sid, tanda, status, prompt = _ringkas['antre'].pop(0)
+        teks = panggil_ringkas(prompt)
+        with _ringkas['kunci']:
+            _ringkas['akhir'][sid] = time.time()
+            if teks:
+                _ringkas['cache'][sid] = {'teks': teks, 'tanda': tanda, 'status': status, 'w': time.time()}
+            else:
+                _ringkas['gagal'] += 1
+
+
+def api_ringkas():
+    if not RINGKAS_MODEL:
+        return {'mati': True}
+    if not cari_claude():
+        return {'galat': 'CLI claude tidak ditemukan'}
+    now = time.time()
+    try:
+        xs = kumpulkan_sesi(now - 24 * 3600, now)
+    except Exception as e:
+        return {'galat': str(e)[:200]}
+    aktif = set()
+    with _ringkas['kunci']:
+        for a in xs:
+            if a.get('peran') != 'Lead' or a.get('master') or a.get('status') not in ('jalan', 'menunggu'):
+                continue
+            if a.get('status') == 'menunggu' and a.get('induk'):
+                continue  # fork yang menunggu = "diserahkan ke Lead": teks tetap di klien, tanpa Haiku
+            sid = a['id']
+            aktif.add(sid)
+            tanda = tanda_ringkas(a)
+            c = _ringkas['cache'].get(sid)
+            if (c and c['tanda'] == tanda) or now - _ringkas['akhir'].get(sid, 0) < RINGKAS_JEDA \
+                    or any(x[0] == sid for x in _ringkas['antre']):
+                continue
+            _ringkas['antre'].append((sid, tanda, a['status'], prompt_ringkas(a)))
+        for sid in [k for k in _ringkas['cache'] if k not in aktif]:
+            if now - _ringkas['cache'][sid]['w'] > 3600:
+                del _ringkas['cache'][sid]
+        if _ringkas['antre']:
+            if not _ringkas['pekerja'] or not _ringkas['pekerja'].is_alive():
+                _ringkas['pekerja'] = threading.Thread(target=pekerja_ringkas, daemon=True)
+                _ringkas['pekerja'].start()
+            _ringkas['ada'].set()
+        hasil = {sid: {'teks': c['teks'], 'status': c['status'], 'w': c['w']} for sid, c in _ringkas['cache'].items() if sid in aktif}
+        return {'ringkas': hasil, 'antre': len(_ringkas['antre']), 'biaya': round(_ringkas['biaya'], 5),
+                'jumlah': _ringkas['jumlah'], 'gagal': _ringkas['gagal']}
 
 
 def cari_claude():
@@ -1734,6 +1952,11 @@ class H(BaseHTTPRequestHandler):
                 nama = ''
             d = dict(api_saran(nama), total=round(_saran['biaya'], 5), jumlah=_saran['jumlah'])  # biaya sejak server menyala
             self.kirim(200, 'application/json', json.dumps(d))
+        elif jalur == '/api/ringkas':  # ringkasan gelembung /kantor pakai Haiku (memakai kuota -> wajib token)
+            self.kirim(200, 'application/json', json.dumps(api_ringkas()))
+        elif jalur == '/api/sesi/bangun':  # buka lagi sesi yang mati di Claude Desktop (lihat BANGUNIN)
+            kode, d = bangun_sesi(body.get('id'))
+            self.kirim(kode, 'application/json', json.dumps(d))
         elif jalur in ('/api/master/ulang', '/api/master/baru'):
             MASTER.henti(lupakan=jalur.endswith('baru'))
             self.kirim(200, 'application/json', json.dumps({'ok': True}))
@@ -1742,6 +1965,9 @@ class H(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if not self.host_ok():
+            return
+        if self.path.split('?')[0] == '/api/sesi/bangun':  # status membangunkan sesi (baca saja)
+            self.kirim(200, 'application/json', json.dumps(api_bangun()))
             return
         if self.path.split('?')[0] == '/api/kostum':  # pemetaan nama sesi -> kostum karakter (file lokal)
             self.kirim(200, 'application/json', json.dumps(api_kostum()))
@@ -1825,6 +2051,9 @@ class H(BaseHTTPRequestHandler):
                 self.kirim(500, 'application/json', json.dumps({'error': str(e)}))
         elif self.path.split('?')[0] in ('/desa', '/desa.html'):
             html = open(os.path.join(DIR, 'desa.html'), encoding='utf-8').read()
+            self.kirim(200, 'text/html; charset=utf-8', html.replace('__TOKEN_MASTER__', MASTER_TOKEN, 1))
+        elif self.path.split('?')[0] in ('/kantor', '/kantor.html'):  # Kantor Agen: kantor isometrik, panel & data sama
+            html = open(os.path.join(DIR, 'kantor.html'), encoding='utf-8').read()
             self.kirim(200, 'text/html; charset=utf-8', html.replace('__TOKEN_MASTER__', MASTER_TOKEN, 1))
         elif self.path.split('?')[0] in ('/kebun', '/kebun.html'):  # Kebun Agen: peta versi Harvest Moon PS1, panel & data sama
             html = open(os.path.join(DIR, 'kebun.html'), encoding='utf-8').read()

@@ -52,7 +52,8 @@ tr.klik{cursor:pointer} tr.klik:hover td{background:var(--bg)}
 .p-Tester{background:#dff5ee;color:#0f6e56;border-color:#0f6e5655}.p-Document{background:#fbeadf;color:#a2481c;border-color:#a2481c55}
 .p-Lain{background:var(--selesai-bg);color:var(--selesai);border-color:var(--garis)}
 .p-Lead{background:#fbe6c8;color:#8e1f2c;border-color:#8e1f2c55}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .p-Lead{background:#4a2a12;color:#ffd77a}}
+.p-Fork{background:#dcf4f5;color:#0e6a70;border-color:#0e6a7055}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .p-Lead{background:#4a2a12;color:#ffd77a}:root:not([data-theme=light]) .p-Fork{background:#0f3d42;color:#7fe0e6}}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .p-Dev{background:#16304f;color:#8cbcf5}:root:not([data-theme=light]) .p-QA{background:#2a2552;color:#b3aaf2}
 :root:not([data-theme=light]) .p-Tester{background:#103b30;color:#7fdcbc}:root:not([data-theme=light]) .p-Document{background:#47271a;color:#f2a57c}}
 .chips{display:flex;gap:8px;flex-wrap:wrap;margin:-6px 0 18px}
@@ -92,10 +93,11 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 function dur(s){s=Math.max(0,Math.round(s));const j=Math.floor(s/3600),m=Math.floor(s%3600/60),d=s%60;return j?`${j}j ${m}m`:m?`${m}m ${String(d).padStart(2,'0')}d`:`${d}d`}
 function jam(t){return new Date(t*1000).toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'})}
 function tgl(t){const d=new Date(t*1000);return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short'})+' '+jam(t)}
-const PERAN=['Lead','Dev','QA','Tester','Document','Lain'];let peranPilih=null;
-function lencana(a){return `<span class="peran p-${esc(a.peran)}${a.peran_tebakan?' tebak':''}" title="${a.peran_tebakan?'Peran ditebak dari kata kunci (agen lama tanpa awalan)':'Peran dari awalan deskripsi'}">${esc(a.peran)}</span>`}
-function cocok(a){const q=$('cari').value.trim().toLowerCase();return (!peranPilih||a.peran===peranPilih)&&(!q||(a.peran+' '+a.deskripsi+' '+a.judul_sesi+' '+a.id+' '+a.prompt).toLowerCase().includes(q))}
-function gambarChips(){if(!DATA)return;const n={};DATA.agen.forEach(a=>n[a.peran]=(n[a.peran]||0)+1);
+const PERAN=['Lead','Fork','Dev','QA','Tester','Document','Lain'];let peranPilih=null;
+const pt=a=>a.peran==='Lead'&&a.induk&&!a.master?'Fork':a.peran;   // sesi fork tampil "Fork" (peran internal tetap Lead)
+function lencana(a){const p=pt(a);return `<span class="peran p-${esc(p)}${a.peran_tebakan?' tebak':''}" title="${p==='Fork'?'Sesi fork dari sesi lain':a.peran_tebakan?'Peran ditebak dari kata kunci (agen lama tanpa awalan)':'Peran dari awalan deskripsi'}">${esc(p)}</span>`}
+function cocok(a){const q=$('cari').value.trim().toLowerCase();return (!peranPilih||pt(a)===peranPilih)&&(!q||(pt(a)+' '+a.deskripsi+' '+a.judul_sesi+' '+a.id+' '+a.prompt).toLowerCase().includes(q))}
+function gambarChips(){if(!DATA)return;const n={};DATA.agen.forEach(a=>n[pt(a)]=(n[pt(a)]||0)+1);
   $('chips').innerHTML=[`<button class="chip${!peranPilih?' aktif':''}" data-p="">Semua ${DATA.agen.length}</button>`,
    ...PERAN.filter(p=>n[p]).map(p=>`<button class="chip${peranPilih===p?' aktif':''}" data-p="${p}"><span class="peran p-${p}" style="margin-right:6px">${p}</span>${n[p]}</button>`)].join('')}
 async function ambil(){

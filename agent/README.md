@@ -199,6 +199,56 @@ Halaman kedua dengan **data dan panel yang sama** (daftar agen, Chat Master, Per
 - **Suasana asri**: halaman berumput dengan jalan setapak, rumput tinggi dan ilalang, bunga liar berkelompok, semak berbunga, rambatan di pagar, lumut di batu, teratai dan alang-alang di kolam/sungai, pohon berbunga/berbuah; capung, kawanan burung, ikan melompat, kelopak terbang, rumput dan daun bergoyang angin; kabut tipis pagi dan berkas sinar pagi/sore. Semua elemen berulang memakai instancing; kepadatan diatur tombol **Rimbun** (rendah/sedang/tinggi).
 - **UI ala UI pack HM BTN** (dibuat ulang, bukan potongan gambar): panel krem-tan bertepi coklat dengan judul di pita berpanah merah, pilihan biru muda dengan sarung tangan menunjuk, kursor sarung tangan, bar tombol bawah jadi hotbar berikon chibi (SVG buatan sendiri), HUD musim/tanggal/jam + jumlah agen bekerja, kartu notifikasi (agen mulai kerja, selesai, menunggu jawabanmu, surat baru dari Master), dan papan kayu nama lokasi saat kamera pindah area. Font game Pixelify Sans (SIL OFL 1.1, `fonts/pixelify-sans.ttf` + `fonts/OFL-PixelifySans.txt`) disematkan lokal untuk judul, HUD, tombol, dan label; isi chat tetap Nunito.
 
+## Kantor Agen (`/kantor`): kantor 2D isometrik
+
+Halaman ketiga dengan **data dan panel yang sama** (daftar, detail, Chat Master + mode kilat, Perlu jawabanmu, Bangunin, pemakaian plan, Quest QA). Petanya berupa kantor bergaya ilustrasi chibi isometrik: dinding krem/pink, lantai kayu, meja + laptop, kursi, rak buku, tanaman, mesin kopi, sticky note. Semua aset dibuat sendiri secara prosedural.
+
+- **Tampilan:** kamera ortografis isometrik sejati (azimut 45 derajat, elevasi atan(1/sqrt2)), jadi garis sejajar tetap sejajar dan tampak 2D. Dinding tinggi hanya di belakang dan kiri; sekat lain setinggi pinggang supaya isi ruangan terlihat.
+- **Bertingkat:** ruang CEO, ruang tim, Ruang Rapat, dan Perpustakaan ada di **lantai 2** (mezanin) dengan balkon berpagar kaca. Dari koridor lantai 1 ada dua tangga: tangga A berbelok bentuk L dengan bordes, dan tangga B lurus lebar di depan Open Space. Lorong samping berbelok ke selatan menuju **Teras Taman** (air mancur, meja payung, bangku). Pegawai benar-benar naik-turun tangga, dan kamera ikut tinggi lantai pegawai yang diikuti.
+- **Tema UI kantor** (bukan tema kebun):
+  - panel kartu putih dengan bilah judul navy dan logo gedung;
+  - dock tombol berikon alat kantor;
+  - kalender meja + jam digital di kanan atas;
+  - notifikasi ala email;
+  - papan nama lokasi berupa pelat pintu logam dan label ruang berupa pelat pintu navy;
+  - "Perlu jawabanmu" sebagai sticky note kuning;
+  - peta mini berupa denah persegi.
+- **Tata ruang otomatis dari sesi live:**
+  - **Ruang CEO** (lantai 2): Chat Master, sendirian.
+  - **Ruang tim**: satu per sesi yang punya fork atau subagen. Sesi itu menjadi kepala tim (meja di belakang tengah), fork dan subagennya menjadi anak buah.
+  - **Open Space**: sesi tunggal tanpa fork.
+  - **Lobi, Pantri, Ruang QA** (papan Quest + slime FAIL), Lorong Taman, Open Space, dan Lounge di lantai 1; Ruang Rapat dan Perpustakaan sebagai pengisi lantai 2.
+  - Ruangan tumbuh atau menyusut saat jumlah anggota atau sesi berubah (kapasitas 2/4/6/8, lalu kelipatan 5). Ruang QA melebar mengikuti jumlah papan Quest.
+- **Perilaku:**
+  - Pegawai duduk di mejanya dan menganimasikan tool terakhirnya: mengetik, membaca dokumen, menelepon (SendMessage / Agent), menunggu, atau tertidur di meja saat diam. Layar laptop menyala sesuai status.
+  - Pegawai berjalan lewat pintu dengan pencarian jalur A* di grid lantai.
+  - Pesan sesi ke Chat Master membuat pengirimnya berjalan ke meja CEO, membungkuk menyerahkan map, lalu kembali ke mejanya. Kalau pengirim sedang tidak duduk, surat dilempar seperti di kebun.
+  - Subagen yang selesai lapor ke CEO dulu, lalu ngopi di pantri, lalu pulang lewat lobi.
+- **NPC dekoratif** (bukan sesi, tidak bisa diklik): resepsionis mengetik di meja depan; satpam berjaga lalu sesekali patroli; OB mengepel di berbagai ruang; barista mengantar kopi ke meja pegawai yang sedang bekerja.
+- **Pengaturan per browser:** `localStorage` `kantorGaya`, `kantorWaktu`, `kantorMusim`, `kantorKontrol`. Tanpa font Pixelify (isi pakai Nunito yang sudah tersemat). Kunci panel chat (`desaMaster`, dll.) dipakai bersama dengan desa dan kebun.
+
+- **Label di atas kepala:** `[JUDUL] [Nama Sesi]`, dengan judul CEO (Chat Master), Lead, Fork, atau peran subagen. Di atasnya ada gelembung satu kalimat bertag status:
+  - **Kerja** (hijau): "Lagi ngerjain X sekarang", atau "Lagi ngerjain X, sebentar lagi selesai" kalau estimasi lebih dari 75% atau teks terakhir sesi menyebut selesai, beres, atau laporan;
+  - **Nunggu** (kuning): "Nunggu jawabanmu soal X";
+  - **Diserahkan** (teal): fork yang sudah beres, "Beres, diserahkan ke <Lead>". Fork tidak menunggu jawabanmu, hasilnya diserahkan ke Lead-nya;
+  - **Tanya** (merah): Lead (bukan fork) yang ada di "Perlu jawabanmu", atau CEO yang punya blok "Perlu kamu jawab" belum dibalas. Tanda ini memunculkan lencana "! Ada pertanyaan" berdenyut dan notifikasi penting (9 detik, bergoyang) sekali per pertanyaan.
+
+  Saat zoom jauh, tag status mini tampil di label nama.
+- **Mendatangi sesi tujuan:** kalau sebuah sesi baru mengirim SendMessage ke sesi lain, karakternya berdiri, berjalan ke meja sesi tujuan (lewat tangga bila beda lantai), menyerahkan map, lalu kembali. Penerimanya diambil dari riwayat sesi (`/api/master/riwayat`, hanya baca, hanya saat tool terakhir sesi itu SendMessage). Pesan ke Chat Master = lapor ke meja CEO.
+- **Ringkasan gelembung oleh Haiku:** teks gelembung sesi Lead (kerja / menunggu jawabanmu) disusun Haiku menjadi satu kalimat santai, misalnya "Lagi diskusi rancangan zona berikutnya sama tim desain". Aturannya:
+  - dibuat ulang hanya kalau aktivitas sesi berubah, paling sering sekali per 90 detik per sesi, satu panggilan sekaligus;
+  - hanya diminta saat halaman /kantor terbuka dan terlihat (`POST /api/ringkas` ber-token);
+  - biaya terukur sekitar 0,00044 USD per panggilan;
+  - kalau gagal, belum ada, atau statusnya sudah berubah, gelembung kembali ke teks aturan.
+- **Jalan-jalan sesudah selesai:** sesi yang menunggu (fork yang diserahkan dan Lead yang menunggu jawabanmu; CEO tidak ikut) meninggalkan meja setelah sekitar 4 detik. Tujuannya pantri, lobi, teras taman, balkon, perpustakaan, lounge, ruang rapat, atau koridor, dipilih tersebar supaya tidak menumpuk; sesekali ia duduk ngopi di kursi pantri yang kosong. Begitu ada panggilan baru (status kembali kerja), ia langsung kembali ke meja.
+- **Chat Master di /kantor:**
+  - panel lebih lebar (minimal sekitar 700px, tetap muat di layar kecil);
+  - daftar tujuan pindah ke kolom kiri yang vertikal: CEO, Lead saja, lalu sesi tidur. Fork disaring lewat field `induk`;
+  - fork tetap bisa dihubungi lewat tombol **Kirim pesan ke sesi ini** di panel detail pegawai, lalu tampil sebagai "Fork terpilih";
+  - chip saran membungkus ke baris baru, tanpa scroll horizontal.
+
+Hubungan fork dan subagen dibaca dari field `induk` di `/api/agen` (lihat bagian API). Di semua halaman (dashboard, /desa, /kebun, /kantor), sesi fork tampil dengan lencana **Fork** (ikon cabang, warna teal), bukan Lead. Panel detailnya menulis "fork dari <sesi induk>". Peran internalnya tetap Lead, jadi penempatan dan logika lain tidak berubah.
+
 ## Chat Master (panel Master di desa)
 
 Tombol **Master** di bar bawah desa membuka jendela chat terpisah. Jendela itu bisa diseret lewat judulnya, diubah ukurannya dari tepi kiri, kanan, bawah, atau sudut bawah, dan ditutup dengan X. Posisi, ukuran, dan status buka/tutupnya diingat per browser. Di layar sempit, jendelanya menempel di bawah selebar layar. Chat ini terhubung ke satu sesi Claude yang bertugas sebagai **koordinator**. Ia melihat sesi Claude lain yang sedang aktif (`ListAgents`), membaca catatan bersama, meneruskan tugas ke sesi yang cocok (`SendMessage`), menunggu balasannya, lalu merangkum hasilnya di panel yang sama. Master tidak mengerjakan tugas sendiri.
@@ -208,6 +258,7 @@ Tombol **Master** di bar bawah desa membuka jendela chat terpisah. Jendela itu b
 - **Panel:** tampil seperti aplikasi chat. Gelembungmu di kanan (jam dan sesi tujuan di bawahnya); jawaban Master di kiri, dengan segel merah "CM", nama, dan jam. Balasan Master yang diawali `[dari X]` tampil sebagai pesan dari X: segel inisial X dan chip nama berwarna, plus keterangan "diteruskan Master". Pesan beruntun dari pengirim yang sama digabung, dan ada pemisah waktu kalau ganti hari atau jeda lama. Saat Master memproses, muncul gelembung "Master sedang mengetik". Markdown dirender: daftar bertingkat, judul, tebal/miring, tabel, kutipan, blok kode dengan tombol **salin**; jalur file di `kode` bisa diklik untuk disalin. Pesan panjang menampilkan paragraf pembuka dan blok pertanyaan, sementara rinciannya dilipat di balik tombol **Tampilkan rincian**. Font chat: Nunito, disimpan lokal di `fonts/` (lisensi SIL OFL 1.1, `fonts/OFL.txt`) dan disematkan ke halaman, jadi tidak ada request ke Google Fonts. Baris kecil "→ <sesi>: ..." muncul tiap kali Master mengirim pesan (klik untuk membuka isinya). Enter mengirim, Shift+Enter baris baru. **Mulai ulang** menghentikan proses (kiriman berikutnya melanjutkan percakapan lewat `--resume`), **Percakapan baru** melupakan konteks lama. Kalau ada balasan saat panel Master tertutup, tombol Master diberi titik merah.
 - **Pilih sesi tujuan:** di atas kotak ketik ada chip sesi Claude yang sedang hidup (titik kuning = sedang kerja, hijau = siap). Klik satu chip, dan pesan berikutnya dikirim dengan baris `[Tujuan: <sesi>]`, sehingga Master langsung meneruskannya ke sesi itu tanpa menebak. Pilihannya menetap sampai diklik lagi atau dibatalkan (× batal). Tanpa pilihan, Master menentukan tujuan sendiri. Daftarnya dibaca dari registry sesi Claude Code (`~/.claude/sessions/<pid>.json`: nama dan status saja; file token di sebelahnya tidak dibuka), dan sesi yang prosesnya sudah mati dilewati.
 - **Mode kilat** (tombol ⚡ **Kilat** di baris tujuan, muncul saat chip sesi dipilih, diingat per browser): pesanmu dikirim **apa adanya** langsung ke sesi itu oleh kurir kecil (Haiku), tanpa dirapikan Master, jadi jauh lebih cepat (sekitar 3 detik; pesan pertama sekitar 9 detik) dan murah (sekitar 0,001 USD per pesan). Sesi membalas ke Master dengan awalan `[kilat]`, dan balasannya langsung tampil di panel sebagai "balasan kilat"; Master cukup mencatat tanpa merangkum. Lampiran gambar ikut sebagai jalur file. Persetujuan tindakan berisiko tetap kamu berikan langsung di sesi tujuan.
+- **Bangunin:** sesi Claude yang sudah mati (bukan Chat Master) diberi tombol **Bangunin** di daftar kiri, di panel detail, dan sebagai chip "zz nama" di baris tujuan Chat Master. Klik = Claude Desktop membuka lagi sesi itu (jendela Desktop pindah ke sana); dalam beberapa detik sesi itu hidup dan bisa dipanggil Master. Belum ada pesan yang dikirim, jadi tidak memakai kuota; izin alat tetap kamu jawab di jendela sesi itu.
 - **Riwayat sesi:** memilih chip sesi juga membuka tab **Riwayat <sesi>** di panel: 80 pesan terakhir sesi itu (pesan user, jawaban Claude, pesan masuk dari sesi lain, pesan keluar, dan ringkasan alat), diperbarui tiap 4 detik. Riwayatnya hanya dibaca dari transkrip sesi, tidak pernah ditulis. Tab **Chat Master** kembali ke percakapan dengan Master, dan diberi titik merah kalau Master membalas saat kamu sedang melihat riwayat. Sesudah mengirim pesan, panel otomatis kembali ke tab Chat Master.
 - **Perlu jawabanmu:** bagian di atas daftar panel kiri muncul kalau ada sesi yang kemungkinan menunggu kamu. Judul tab browser ikut diberi angka, misalnya "(1) Desa Agen". Ada dua jenis, keduanya dideteksi dengan aturan sederhana tanpa model (gratis):
   - **tanya:** sesi sedang idle dan jawaban terakhir Claude berupa pertanyaan atau permintaan keputusan (diakhiri `?`, "bilang restart", "pilih A/B", "setuju", dan sejenisnya).
@@ -276,7 +327,9 @@ Data QA dimuat ulang tiap 30 detik. Papan dan slime hanya dibangun ulang kalau a
 | `GET /` | dashboard |
 | `GET /desa` | Desa Agen |
 | `GET /kebun` | Kebun Agen (peta versi Harvest Moon: Back to Nature, panel & data sama) |
-| `GET /api/agen?jam=24` | daftar agen dalam N jam terakhir, lengkap; juga `akar` (folder yang dibaca) dan `peringatan` |
+| `GET /kantor` | Kantor Agen (kantor 2D isometrik: ruang CEO, ruang tim per fork, open space, NPC; panel & data sama) |
+| `POST /api/ringkas` | (ber-token) ringkasan gelembung /kantor oleh Haiku: `{ringkas: {id: {teks, status, w}}, antre, biaya, jumlah, gagal}`; memicu pembaruan di latar untuk sesi yang aktivitasnya berubah |
+| `GET /api/agen?jam=24` | daftar agen dalam N jam terakhir, lengkap; juga `akar` (folder yang dibaca) dan `peringatan`. Tiap entri punya `induk`: sessionId sesi asal (fork: dari baris pertama transkripnya; subagen: folder sesi pemiliknya), atau `null` |
 | `GET /api/agen?jam=24&ringkas=1` | daftar tanpa `prompt` / `laporan` / `tugas` (dipakai desa) |
 | `GET /api/agen/detail?id=<id>` | satu agen, lengkap |
 | `GET /catatan` | isi catatan bersama terakhir (teks markdown) |

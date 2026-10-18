@@ -44,7 +44,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#9fc5a8;font:14px/1.45
 .d-jalan{background:#3fbf7a;box-shadow:0 0 6px #3fbf7a}.d-diam{background:#e8a83a}.d-selesai{background:#9a917e}
 .peran{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;padding:1px 6px 1px 4px;border-radius:5px;flex:none;border:1px solid rgba(0,0,0,.25)}
 .peran svg{width:11px;height:11px;fill:currentColor;flex:none}
-.p-Dev{background:#16304f;color:#8cbcf5}.p-QA{background:#2a2552;color:#b3aaf2}.p-Tester{background:#103b30;color:#7fdcbc}.p-Document{background:#47271a;color:#f2a57c}.p-Lain{background:#3a3530;color:#d8d0c0}.p-Lead{background:#4a2a12;color:#ffd77a}
+.p-Dev{background:#16304f;color:#8cbcf5}.p-QA{background:#2a2552;color:#b3aaf2}.p-Tester{background:#103b30;color:#7fdcbc}.p-Document{background:#47271a;color:#f2a57c}.p-Lain{background:#3a3530;color:#d8d0c0}.p-Lead{background:#4a2a12;color:#ffd77a}.p-Fork{background:#0f3d42;color:#7fe0e6}
 .d-menunggu{background:#5aa8e8}
 @keyframes muncul{from{opacity:0;transform:translateY(-8px) scale(.98)}}
 #kanan{right:12px;top:12px;width:364px;max-height:calc(100% - 24px);overflow:auto;padding:14px 16px;display:none;animation:muncul .22s ease-out}
@@ -127,6 +127,7 @@ body.ukurPanel{user-select:none}
 .mtanya{display:block;margin:6px 0;padding:6px 8px 6px 9px;border-radius:7px;background:#fff1c2;border:1px solid #d9a83a;border-left:4px solid #c9821e;white-space:normal}
 .mtanya .mtj{display:block;font:700 11.5px/1.3 var(--serif);color:#8a4a0e;letter-spacing:.02em;margin-bottom:2px}
 .mtanya ol{margin:2px 0 0;padding-left:18px}
+.mtanya ol li.mgrup{list-style:none;margin:9px 0 3px -14px;font-weight:800;font-style:italic;color:var(--teks2)}
 .mopsi{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0 2px}
 .mop{font:inherit;font-size:11.5px;padding:2px 9px;border-radius:999px;border:1px solid #c9821e;background:#fffaf0;color:#5a3410;cursor:pointer}
 .mop:hover{background:#ffe7a8}.mop.on{background:linear-gradient(#f0cc6a,#d4a447);border-color:#8a5a1e;color:#2a1a0c;font-weight:700}
@@ -449,13 +450,16 @@ body.ukurPanel{user-select:none}
 .mkaki .ke.kilat,.mk .ke .kl{color:#a8620e}.mkaki .ke.kilat{background:rgba(240,184,48,.28)}
 .mkaki .ke .ik,.mk .kl .ik{width:11px;height:11px}
 .mx.mantar{color:#a8620e}.mkep .mvia.kl{color:#a8620e}
+.bangunin{font:600 11px/1.3 inherit;padding:2px 9px;margin-right:6px;border-radius:999px;border:1px solid var(--emas,#a8761e);background:rgba(232,196,106,.3);color:var(--teks,#2a1a0c);cursor:pointer;white-space:nowrap}
+.bangunin:hover{background:rgba(232,196,106,.6)}.bangunin.proses{opacity:.65;cursor:progress}
+.msc.mati{opacity:.75;border-style:dashed}.msc.mati.proses{opacity:.55}
 </style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 </head>
 <body>
 <div id="dunia"></div>
 <aside id="kiri" class="panel">
-  <header><h1>Desa Agen <a href="/">dashboard</a></h1><div class="ringkas" id="ringkas">memuat...</div>
+  <header><h1>Desa Agen <a href="/">dashboard</a> <a href="/kantor" title="Versi Kantor Agen (2D isometrik)">kantor</a></h1><div class="ringkas" id="ringkas">memuat...</div>
     <button id="pakai" title="Pemakaian plan Claude - klik untuk rincian"></button>
     <div class="tabs"><button class="tab on" data-tab="agen">Agen</button><button class="tab" data-tab="quest">Quest QA</button></div></header>
   <div id="perlu" aria-live="polite"><div class="pkep" title="Klik untuk melipat"><span class="jml">0</span><span>Perlu jawabanmu</span><span class="ket">klik untuk membuka</span></div><div class="pdaf"></div></div>
@@ -531,8 +535,12 @@ const IKON = {
   Tester: '<svg viewBox="0 0 16 16"><path d="M14.5 1.5 15 4 7.5 11.5l-3-3L12 1zM3.6 9.2l3.2 3.2-1.4 1.4-.9-.9-1.8 1.8-1.4-1.4 1.8-1.8-.9-.9z"/></svg>',
   Document: '<svg viewBox="0 0 16 16"><path d="M15 1C9 1.5 4.5 6 3.2 12.6l-1.7 1.7.9.9 1.7-1.7C10.4 12.3 14.6 8 15 1zM5 11c1.3-3 3.6-5.5 6.5-7-2.2 2.2-4 4.6-5.2 7.4z"/></svg>',
   Lead: '<svg viewBox="0 0 16 16"><path d="M1 4.5 4.6 8 8 2.5 11.4 8 15 4.5 13.6 13H2.4zM2.6 14h10.8v1.2H2.6z"/></svg>',
+  Fork: '<svg viewBox="0 0 16 16"><circle cx="4" cy="3" r="2"/><circle cx="4" cy="13" r="2"/><circle cx="12" cy="4.5" r="2"/><path d="M3.3 4.5h1.4v7H3.3zM11.3 6.3h1.4c0 3.3-2.2 4.6-5.7 5.1l-.2-1.4c3-.4 4.5-1.4 4.5-3.7z"/></svg>',
   Lain: '<svg viewBox="0 0 16 16"><path d="M2.5 3.5h8v9a1.5 1.5 0 0 1-1.5 1.5H4a1.5 1.5 0 0 1-1.5-1.5zM10.5 5.5h1.8a1.7 1.7 0 0 1 1.7 1.7v1.6a1.7 1.7 0 0 1-1.7 1.7h-1.8v-1.4h1.6a.6.6 0 0 0 .6-.6V7.5a.6.6 0 0 0-.6-.6h-1.6z"/></svg>'};
 const pil = (p, teks = p) => `<span class="peran p-${esc(p)}">${IKON[p] || ''}${esc(teks)}</span>`;
+// sesi fork (sesi utama hasil fork sesi lain, field `induk` dari server) tampil sebagai "Fork"; peran internal tetap 'Lead'
+const peranTampil = a => a && a.peran === 'Lead' && a.induk && !a.master ? 'Fork' : (a ? a.peran : 'Lain');
+const namaInduk = a => { const x = (DATA.agen || []).find(y => y.id === 'sesi-' + a.induk); return x ? x.deskripsi : 'sesi lain'; };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 // umur / durasi dalam satuan jelas: "45 dtk", "13 mnt", "2 j 5 mnt", "3 hr 4 j"
 const dur = s => {s=Math.max(0,Math.round(s));const h=Math.floor(s/86400),j=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
@@ -1803,25 +1811,33 @@ function teksJawab(s, ctx){
   const pra = s.slice(0, m.index), sisa = s.slice(m.index + m[0].length).split('\n'), poin = [];
   // poin = butir bernomor (atau butir "-" kalau tak bernomor). Butir "-" di bawah poin bernomor = PILIHAN poin itu.
   const RE_NUM = /^\s*\d+[.)]\s+/, RE_DASH = /^\s*[-*]\s+/;
+  // judul grup di sela poin ("*Sesi A (/kantor)*", "**Tim B:**", "### X"): dicatat & ditampilkan, daftar tidak putus.
+  // Hanya dianggap judul kalau baris isi berikutnya poin bernomor (judul penutup / teks biasa tetap memutus daftar).
+  const RE_GRUP = /^\s*(?:(\*\*|\*|_)(?!\s)(.+?)\1\s*:?|#{1,4}\s+(.+?))\s*$/, grup = [];
+  const isiBerikut = j => { for (let k = j; k < sisa.length; k++) if (sisa[k].trim()) return k; return -1; };
+  const grupSah = j => { if (j < 0 || RE_DASH.test(sisa[j]) || !RE_GRUP.test(sisa[j])) return false; const k = isiBerikut(j + 1); return k >= 0 && RE_NUM.test(sisa[k]); };
   let i = 0;
   for (; i < sisa.length; i++){ const b = sisa[i], P = poin[poin.length - 1];
     if (/^\s*$/.test(b)){ if (!poin.length) continue;
-      const nx = sisa.slice(i + 1).find(x => x.trim()); if (nx && (RE_NUM.test(nx) || RE_DASH.test(nx))) continue; break; }
+      const j = isiBerikut(i + 1), nx = j < 0 ? '' : sisa[j]; if (nx && (RE_NUM.test(nx) || RE_DASH.test(nx) || grupSah(j))) continue; break; }
+    if (grupSah(i)){ const g = RE_GRUP.exec(b); grup.push({sebelum: poin.length, t: (g[2] || g[3] || '').trim()}); continue; }
     if (RE_DASH.test(b) && P && P.num){ P.sub.push(b.replace(RE_DASH, '')); continue; }
-    if (RE_NUM.test(b) || RE_DASH.test(b)){ poin.push({t: b.replace(RE_NUM, '').replace(RE_DASH, ''), num: RE_NUM.test(b), sub: []}); continue; }
+    if (RE_NUM.test(b) || RE_DASH.test(b)){ poin.push({t: b.replace(RE_NUM, '').replace(RE_DASH, ''), num: RE_NUM.test(b), n: RE_NUM.test(b) ? parseInt(b, 10) : 0, sub: []}); continue; }
     if (/^\s{2,}\S/.test(b) && P){ if (P.sub.length) P.sub[P.sub.length - 1] += ' ' + b.trim(); else P.t += ' ' + b.trim(); continue; }  // lanjutan baris
     break; }
   if (!poin.length) return mdChat(s);
   const pasca = sisa.slice(i).join('\n').replace(/^\n+/, '');
   const aktif = ctx && ctx.aktif, pilih = aktif && MCHAT.jawab.id === ctx.id ? MCHAT.jawab.p : {};
   let nRek = 0;
+  const unik = poin.every(P => P.n > 0) && new Set(poin.map(P => P.n)).size === poin.length, kunci = k => unik ? poin[k].n : k + 1;   // nomor tulisan Master
   const li = poin.map((P, k) => { const saran = cabutSaran(P), os = aktif ? opsiPoinLengkap(P) : [];
     const rek = os.some(o => cocokSaran(o, saran)); if (rek) nRek++;
     const sub = P.sub.length ? `<ul class="msub">${P.sub.map(x => `<li>${teksChat(x)}</li>`).join('')}</ul>` : '';
     // label saran tampil kalau tak ada tombol yg bisa ditandai (blok lama / riwayat / saran di luar pilihan)
     const lbl = saran && !rek ? `<span class="msaran" title="Rekomendasi Master">${IK.bintang}saran: ${esc(saran)}</span>` : '';
-    return `<li>${teksChat(P.t)}${lbl}${sub}${os.length ? `<span class="mopsi">${os.map(o => { const r = cocokSaran(o, saran);
-      return `<button type="button" class="mop${pilih[k + 1] === o.nilai ? ' on' : ''}${r ? ' rek' : ''}"${r ? ' title="Disarankan Master"' : ''} data-id="${ctx.id}" data-p="${k + 1}" data-n="${poin.length}" data-v="${esc(o.nilai)}">${r ? IK.bintang : ''}${teksChat(o.label)}</button>`; }).join('')}</span>` : ''}</li>`; }).join('');
+    const judul = grup.filter(g => g.sebelum === k).map(g => `<li class="mgrup">${teksChat(g.t)}</li>`).join('');
+    return `${judul}<li value="${kunci(k)}">${teksChat(P.t)}${lbl}${sub}${os.length ? `<span class="mopsi">${os.map(o => { const r = cocokSaran(o, saran);
+      return `<button type="button" class="mop${pilih[kunci(k)] === o.nilai ? ' on' : ''}${r ? ' rek' : ''}"${r ? ' title="Disarankan Master"' : ''} data-id="${ctx.id}" data-p="${kunci(k)}" data-n="${poin.length}" data-v="${esc(o.nilai)}">${r ? IK.bintang : ''}${teksChat(o.label)}</button>`; }).join('')}</span>` : ''}</li>`; }).join('');
   const sudah = ctx && ctx.dijawab ? '<span class="mtsudah">sudah dijawab</span>' : '';
   const pakai = aktif && nRek ? `<button type="button" class="mpakai" data-id="${ctx.id}" title="Isi semua poin dengan pilihan yang disarankan (belum dikirim)">${IK.bintang}pakai semua saran</button>` : '';
   return mdChat(pra.replace(/\n+$/, '')) + `<span class="mtanya${ctx && ctx.dijawab ? ' lama' : ''}"><span class="mtj">Perlu kamu jawab${sudah}${pakai}</span><ol>${li}</ol></span>` + (pasca ? mdChat(pasca) : '');
@@ -2086,6 +2102,9 @@ function gambarSesi(){
     + (MCHAT.sesi.length
     ? MCHAT.sesi.map(x => `<button type="button" class="msc${x.nama === MCHAT.tujuan ? ' on' : ''}" data-nama="${esc(x.nama)}" title="${x.status === 'sibuk' ? 'Sedang kerja' : 'Siap'} - klik untuk ${x.nama === MCHAT.tujuan ? 'membatalkan' : 'mengirim pesan berikutnya ke sesi ini'}"><i class="${x.status}"></i>${esc(x.nama)}</button>`).join('')
     : '<span class="lbl2">tidak ada sesi lain yang aktif</span>')
+    + ((() => { try { return semuaAgen(); } catch (e) { return []; } })().length ? (() => { try { return semuaAgen(); } catch (e) { return []; } })().filter(bisaBangun).filter(a => !MCHAT.sesi.some(x => x.nama === a.deskripsi)).sort((p, q) => (q.akhir || 0) - (p.akhir || 0)).slice(0, 6)
+      .map(a => { const sid = a.id.slice(5), s = BANGUN.st[sid], proses = s && s.status === 'membangunkan';
+        return `<button type="button" class="msc mati${proses ? ' proses' : ''}" data-bangun="${esc(sid)}" title="Sesi ini sedang tidur - klik untuk membangunkannya di Claude Desktop">${proses ? 'membangunkan ' : 'zz '}${esc(a.deskripsi)}</button>`; }).join('') : '')
     + (MCHAT.tujuan ? `<button type="button" class="batal" title="Biarkan Master yang memilih tujuan">&times; batal</button>` : '');
   $('mTeks').placeholder = MCHAT.tujuan ? (MCHAT.kilat ? `Langsung ke ${MCHAT.tujuan} (kilat, tanpa Master)...` : `Pesan untuk ${MCHAT.tujuan} (lewat Master)...`) : 'Tulis ke Master... (Enter kirim, Shift+Enter baris baru, Ctrl+V tempel gambar)';
 }
@@ -2248,6 +2267,7 @@ $('mTab').addEventListener('click', e => { const b = e.target.closest('button[da
 for (const id of ['mSesi', 'mSaran']) $(id).addEventListener('wheel', e => { const el = $(id);
   if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)){ el.scrollLeft += e.deltaY; e.preventDefault(); } }, {passive:false});
 $('mSesi').addEventListener('click', e => {
+  const bb = e.target.closest('[data-bangun]'); if (bb){ bangunin(bb.dataset.bangun); return; }   // chip sesi tidur -> bangunkan
   if (e.target.closest('.mkilat')){ MCHAT.kilat = !MCHAT.kilat; try { localStorage.setItem('desaKilat', MCHAT.kilat ? '1' : '0'); } catch (e2) {} gambarSesi(); $('mTeks').focus(); return; }
   if (e.target.closest('.batal')){ MCHAT.tujuan = ''; MCHAT.lihat = 'master'; gambarSesi(); gambarChat(true); gambarSaran(); return; }
   const b = e.target.closest('.msc'); if (!b) return;
@@ -2859,7 +2879,7 @@ function tulisLabel(o){
   }
   const zz = a.status === 'diam' ? '<div class="zz">z Z z</div>' : '';
   o.div.className = 'lbl' + (dipilih ? ' pilih' : '') + (gelembung || dipilih ? '' : ' sembunyiLbl');
-  o.div.innerHTML = `<div class="isi">${zz}${gel}<span class="nama">${a.deskripsi === 'Chat Master' ? '' : pil(a.peran)}${esc(nama)}</span>${jalan && !lead ?`<div class="pb"><i style="width:${pct}%"></i></div>`:''}</div>`;
+  o.div.innerHTML = `<div class="isi">${zz}${gel}<span class="nama">${a.deskripsi === 'Chat Master' ? '' : pil(peranTampil(a))}${esc(nama)}</span>${jalan && !lead ?`<div class="pb"><i style="width:${pct}%"></i></div>`:''}</div>`;
 }
 
 // ═════ ANIMASI PER FRAME ═════
@@ -3154,7 +3174,7 @@ function gambarDaftar(){
   const item = (a, arsip) => { const lama = a.status==='jalan' ? now-a.mulai : a.durasi;
     // kartu: segel inisial (warna dari nama, cincin = status) + nama + aktivitas terakhir; lencana peran hanya subagen
     const akt = aktivitasKartu(a);
-    return `<div class="item kartu${a.id===pilihId?' pilih':''}${arsip?' arsip':''}" data-id="${esc(a.id)}" title="${esc(a.deskripsi)}${akt ? ' - ' + esc(akt) : ''}"><span class="ava st-${a.status}" style="--h:${hashTeks(a.deskripsi || a.id) % 360}">${esc(inisial(a.deskripsi))}</span><span class="isiK"><span class="nm">${esc(a.deskripsi)}</span>${akt ? `<span class="akt">${esc(akt)}</span>` : ''}</span><span class="kananK"><span class="wkt">${dur(lama)}</span>${a.peran === 'Lead' ? '' : pil(a.peran)}</span></div>`; };
+    return `<div class="item kartu${a.id===pilihId?' pilih':''}${arsip?' arsip':''}" data-id="${esc(a.id)}" title="${esc(a.deskripsi)}${akt ? ' - ' + esc(akt) : ''}"><span class="ava st-${a.status}" style="--h:${hashTeks(a.deskripsi || a.id) % 360}">${esc(inisial(a.deskripsi))}</span><span class="isiK"><span class="nm">${esc(a.deskripsi)}</span>${akt ? `<span class="akt">${esc(akt)}</span>` : ''}</span><span class="kananK">${tombolBangun(a)}<span class="wkt">${dur(lama)}</span>${a.peran === 'Lead' ? (peranTampil(a) === 'Fork' ? pil('Fork') : '') : pil(a.peran)}</span></div>`; };
   // peringatan sumber data di atas daftar (bedakan dari "memang tak ada agen")
   const awas = DATA.peringatan ? `<div style="margin:8px 4px;padding:8px 10px;border-radius:8px;background:rgba(240,181,74,.28);color:#7a4a08;border:1px solid rgba(168,118,30,.5);font-size:12.5px">${esc(DATA.peringatan)}</div>` : '';
   const ST_TEKS = {jalan:'sedang kerja', menunggu:'menunggu', diam:'diam', selesai:'selesai'};
@@ -3216,8 +3236,8 @@ function gambarDetailLead(a, dd, lama, akt){
   const buka = nama => (terbuka.has(nama) ? 'open' : '');
   const riwayat = (dd.tugas || []).map(x => `<div style="padding:5px 0;border-top:1px solid var(--garis);font-size:12.5px">
       <div style="color:var(--teks3);font-size:11.5px">${x.mulai ? jam(x.mulai) : '-'} · ${dur(x.durasi||0)} · ${x.tools} aksi</div>${esc(x.teks)}</div>`).join('');
-  $('detail').innerHTML = `${pil('Lead')} <span style="font-size:11px;color:var(--teks3)">sesi utama (tanpa agen)</span>
-    <h2>${esc(a.deskripsi)}</h2>
+  $('detail').innerHTML = `${peranTampil(a) === 'Fork' ? `${pil('Fork')} <span style="font-size:11px;color:var(--teks3)">fork dari ${esc(namaInduk(a))}</span>` : `${pil('Lead')} <span style="font-size:11px;color:var(--teks3)">sesi utama (tanpa agen)</span>`}
+    <h2>${esc(a.deskripsi)}</h2>${tombolBangun(a) ? `<div style="margin:4px 0 8px">${tombolBangun(a)}<span style="font-size:11.5px;color:var(--teks3);margin-left:6px">sesi ini sedang tidur; bangunkan supaya bisa dipanggil Master</span></div>` : ''}
     <div class="kv"><span>Status</span><span>${esc(a.status)} · ${esc(akt||'')}</span>
     <span>Tugas sejak</span><span>${jam(a.mulai)}</span><span>${a.status==='jalan'?'Sudah':'Durasi'}</span><span>${dur(lama)}</span>
     <span>Aksi tugas ini</span><span>${a.tools}</span><span>Tool terakhir</span><span>${esc(a.tool_akhir||'-')}</span>
@@ -3228,6 +3248,33 @@ function gambarDetailLead(a, dd, lama, akt){
     ${a.teks_akhir?`<div style="font-size:12.5px;color:var(--teks2);margin-top:6px">${esc(a.teks_akhir.slice(0,400))}</div>`:''}
     <details ${buka('Riwayat tugas')}><summary>Riwayat tugas</summary>${riwayat || '<div style="font-size:12px;color:var(--teks3)">memuat...</div>'}</details>`;
 }
+// ═ BANGUNIN: sesi Lead yang mati (bukan Chat Master) bisa dibuka lagi di Claude Desktop lewat server (POST /api/sesi/bangun);
+// tombol di kartu daftar, panel detail, dan chip "tidur" di Chat Master. Status dipantau lewat GET /api/sesi/bangun. ═
+var BANGUN = {st: {}, timer: null};   // var: dibaca gambarSesi yang bisa terpanggil sebelum blok ini
+function bisaBangun(a){ if (!a || a.peran !== 'Lead' || a.status !== 'selesai' || a.master || !/^sesi-[0-9a-f-]{36}$/.test(a.id)) return false;
+  // nama yang sama sedang hidup, atau ada transkrip lebih baru bernama sama -> tombol tidak ditampilkan (sama dengan aturan server)
+  return !semuaAgen().some(x => x !== a && x.peran === 'Lead' && x.deskripsi === a.deskripsi && (x.status !== 'selesai' || (x.akhir || 0) > (a.akhir || 0))); }
+function tombolBangun(a){ if (!bisaBangun(a)) return ''; const sid = a.id.slice(5), s = BANGUN.st[sid], proses = s && s.status === 'membangunkan';
+  return `<button type="button" class="bangunin${proses ? ' proses' : ''}" data-bangun="${esc(sid)}" title="Buka lagi sesi ini di Claude Desktop supaya bisa dipanggil Master">${proses ? 'Membangunkan...' : 'Bangunin'}</button>`; }
+async function bangunin(sid){
+  const a = semuaAgen().find(x => x.id === 'sesi-' + sid), nama = a ? a.deskripsi : 'sesi';
+  if (BANGUN.st[sid] && BANGUN.st[sid].status === 'membangunkan') return;
+  if (!confirm(`Bangunin sesi "${nama}"?\n\nClaude Desktop akan membuka sesi itu (jendela Desktop pindah ke sesi tersebut). Belum ada pesan yang dikirim.`)) return;
+  try { await postMaster('/api/sesi/bangun', {id: sid}); BANGUN.st[sid] = {status: 'membangunkan', nama}; segarBangun(); setTimeout(ambilBangun, 1500); }
+  catch (e) { alert('Gagal membangunkan ' + nama + ': ' + e.message); }
+}
+async function ambilBangun(){
+  try { const r = await fetch('/api/sesi/bangun', {cache: 'no-store'}); if (!r.ok) return; const j = await r.json(), lama = BANGUN.st; BANGUN.st = j.sesi || {};
+    let berubah = false;
+    for (const [sid, s] of Object.entries(BANGUN.st)) if (lama[sid] && lama[sid].status === 'membangunkan' && s.status !== 'membangunkan'){ berubah = true;
+      if (typeof notif === 'function') notif(s.status === 'hidup' ? 'benih' : 'seru', s.nama, s.status === 'hidup' ? 'sudah bangun, siap dipanggil' : s.pesan); }
+    if (berubah){ ambil(); ambilSesi(); }
+    segarBangun();
+    if (Object.values(BANGUN.st).some(s => s.status === 'membangunkan')) setTimeout(ambilBangun, 2000); } catch (e) {}
+}
+function segarBangun(){ gambarDaftar(); if (pilihId && pilihId.startsWith('sesi-')) gambarDetail(); gambarSesi(); }
+$('detail').addEventListener('click', e => { const b = e.target.closest('[data-bangun]'); if (b) bangunin(b.dataset.bangun); });
+ambilBangun();
 function pilih(id, terbang=true){
   pilihId = id; QUEST.pilih = null; sorot.visible = false; kam.fokusPos = null;
   for (const o of AGEN.values()){ o.s.cincin.visible = o.id===id; tulisLabel(o); }
@@ -3239,6 +3286,7 @@ $('daftar').addEventListener('click', e => {
   const lipat = e.target.closest('.grpLipat');
   if (lipat && lipat.dataset.lipat === 'sub'){ subSembunyi = !subSembunyi; try { localStorage.setItem('desaSubDiam', subSembunyi ? '' : 'tampil'); } catch (e2) {} gambarDaftar(); return; }
   if (lipat){ arsipSembunyi = !arsipSembunyi; try { localStorage.setItem('desaArsip', arsipSembunyi ? 'sembunyi' : ''); } catch (e2) {} gambarDaftar(); return; }
+  const bb = e.target.closest('[data-bangun]'); if (bb){ bangunin(bb.dataset.bangun); return; }   // tombol Bangunin di kartu (bukan memilih kartu)
   const it = e.target.closest('.item'); if (it) pilih(it.dataset.id); });
 $('kanan').querySelector('.tutup').onclick = () => { pilihId = null; QUEST.pilih = null; sorot.visible = false; if (TAB === 'quest') gambarQuest(); for (const o of AGEN.values()){ o.s.cincin.visible=false; tulisLabel(o); } gambarDetail(); gambarDaftar(); };
 
@@ -3403,7 +3451,7 @@ el.addEventListener('pointermove', e => {
   const n = performance.now(); if (n - tipT < 70) return; tipT = n;
   const h = pick(e.clientX, e.clientY); let html = '';
   if (h?.agen){ const o = AGEN.get(h.agen), a = o?.data; if (a){ const nowS = Date.now()/1000 + selisih, lama = a.status === 'jalan' ? nowS - a.mulai : a.durasi;
-    html = `${pil(a.peran)} <b>${esc(a.deskripsi)}</b><br>${esc(AKTIVITAS[o.animTampil] || a.status)} · ${dur(lama)}${a.tool_akhir ? ' · ' + esc(a.tool_akhir.replace(/^.*\./, '')) : ''}`; } }
+    html = `${pil(peranTampil(a))} <b>${esc(a.deskripsi)}</b><br>${esc(AKTIVITAS[o.animTampil] || a.status)} · ${dur(lama)}${a.tool_akhir ? ' · ' + esc(a.tool_akhir.replace(/^.*\./, '')) : ''}`; } }
   else if (h?.tc){ const t = QUEST.data?.tc?.find(x => x.id === h.tc); if (t) html = `<b>${esc(t.id)}</b> · ${esc(NAMA_QA[statusTC(t)] || statusTC(t))}<br>${esc(t.k)}`; }
   else if (h?.papan) html = `<b>Papan ${esc(h.papan)}</b><br>klik untuk membuka daftar test case`;
   if (!html){ tip.style.display = 'none'; el.style.cursor = ''; return; }
