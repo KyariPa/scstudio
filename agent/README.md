@@ -224,7 +224,19 @@ Halaman ketiga dengan **data dan panel yang sama** (daftar, detail, Chat Master 
   - Pegawai berjalan lewat pintu dengan pencarian jalur A* di grid lantai.
   - Pesan sesi ke Chat Master membuat pengirimnya berjalan ke meja CEO, membungkuk menyerahkan map, lalu kembali ke mejanya. Kalau pengirim sedang tidak duduk, surat dilempar seperti di kebun.
   - Subagen yang selesai lapor ke CEO dulu, lalu ngopi di pantri, lalu pulang lewat lobi.
-- **NPC dekoratif** (bukan sesi, tidak bisa diklik): resepsionis mengetik di meja depan; satpam berjaga lalu sesekali patroli; OB mengepel di berbagai ruang; barista mengantar kopi ke meja pegawai yang sedang bekerja.
+- **NPC dekoratif** (bukan sesi, tidak bisa diklik), masing-masing punya rutinitas acak:
+  - resepsionis: mengetik, menelepon, membaca dokumen, sesekali mengambil kopi atau menyiram tanaman lobi, melambai menyapa tamu dan kurir;
+  - satpam: berjaga dengan tangan di belakang sambil menoleh, patroli beberapa titik (termasuk lantai 2 dan teras), memeriksa buku tamu;
+  - OB: mengepel beberapa titik, menyiram tanaman, mengelap meja rapat/QA/pantri/perpustakaan;
+  - barista: menyeduh di mesin kopi lalu mengantar kopi ke pegawai yang sedang bekerja, mengelap meja pantri, mengobrol dengan pegawai yang ngopi;
+  - tamu (rupa bergantian) datang ke resepsionis, menunggu di sofa lobi sambil membaca, lalu pulang; kurir paket sesekali mengantar kardus ke resepsionis.
+- **Gedung pencakar langit:** kantor adalah satu lantai tinggi di menara kaca.
+  - Di bawah lantai, badan menara berfasad kaca turun ke kota berkabut. Menara-menara kota ada di bawah dan sekeliling, awan melayang di antaranya, dan kabut makin pekat ke bawah.
+  - Dinding luar belakang dan kiri kaca penuh, tepi depan, kanan, dan teras berpagar kaca. Dari POV CEO, langit dan kota terlihat lewat kaca.
+  - Malam hari jendela menara dan kota menyala.
+  - Tamu, kurir, dan pegawai keluar-masuk lewat lift di dinding barat lobi; pintunya membuka saat ada orang di depannya.
+- **Gaya Render mulus** (bawaan, tombol **Gaya**: Render mulus -> HD kartun -> PS1 240p): tampilan ala render 3D diorama, yaitu material halus, lantai kayu dan ubin mengilap, kaca gedung memantul, sudut dan kaki perabot gelap lembut (ambient occlusion), bayangan lembut, warna filmis, tanpa garis tepi kartun. Gaya lama tetap ada sebagai "HD kartun". Pilihan diingat per browser; browser yang sebelumnya memakai HD dipindah ke Render mulus sekali.
+- **Tanpa tabrakan:** jalur menjaga jarak dari meja, kursi, dinding, dan pagar (badan karakter tidak menempel atau menembus perabot), pejalan saling menyamping atau antre, dan titik berdiri selalu di lantai lapang. Lorong antar meja dan balkon di belakang tangga diperlebar supaya muat badan karakter.
 - **Pengaturan per browser:** `localStorage` `kantorGaya`, `kantorWaktu`, `kantorMusim`, `kantorKontrol`. Tanpa font Pixelify (isi pakai Nunito yang sudah tersemat). Kunci panel chat (`desaMaster`, dll.) dipakai bersama dengan desa dan kebun.
 
 - **Label di atas kepala:** `[JUDUL] [Nama Sesi]`, dengan judul CEO (Chat Master), Lead, Fork, atau peran subagen. Di atasnya ada gelembung satu kalimat bertag status:
@@ -240,9 +252,18 @@ Halaman ketiga dengan **data dan panel yang sama** (daftar, detail, Chat Master 
   - hanya diminta saat halaman /kantor terbuka dan terlihat (`POST /api/ringkas` ber-token);
   - biaya terukur sekitar 0,00044 USD per panggilan;
   - kalau gagal, belum ada, atau statusnya sudah berubah, gelembung kembali ke teks aturan.
+- **POV CEO** (`/kantor?pov=ceo`, tautan "pov ceo" di header /kantor): tampilan orang pertama dari kursi CEO, tanpa saklar ke isometrik.
+  - Di depan ada meja CEO, kursi tamu, dan dinding kaca berpintu; kantor terlihat lewat kaca.
+  - Pegawai yang lapor berdiri di depan meja dan menyerahkan map; gelembung, tag status, dan "! Ada pertanyaan" tetap tampil.
+  - Seret = menengok, scroll = zoom, Reset = pandangan awal; klik pegawai = detail; peta mini menampilkan kerucut pandang.
+  - Chat Master, kolom tujuan, Kilat, dan Perlu jawaban sama dengan /kantor.
+  - Meja CEO memakai monitor lebar berisi dashboard mini live: jumlah pegawai kerja, nunggu, tanya, dan diserahkan, plus daftar sesi dengan gelembung ringkasnya.
+  - Proporsi ruangan disesuaikan dengan tinggi karakter berdiri (sekitar 3,4): dinding 5,2, pintu ruang CEO 4,0, jendela, jam, payung, dan lampu teras lebih tinggi.
+  - **Fokus layar:** tekan F, klik monitor, atau tombol Layar. Kamera meluncur ke depan monitor, sementara kantor tetap terlihat di sekelilingnya. Monitor menampilkan desktop Windows dan Chat Master terbuka menempel di layarnya, di atas taskbar. Esc atau "Kembali ke kursi" untuk keluar.
 - **Jalan-jalan sesudah selesai:** sesi yang menunggu (fork yang diserahkan dan Lead yang menunggu jawabanmu; CEO tidak ikut) meninggalkan meja setelah sekitar 4 detik. Tujuannya pantri, lobi, teras taman, balkon, perpustakaan, lounge, ruang rapat, atau koridor, dipilih tersebar supaya tidak menumpuk; sesekali ia duduk ngopi di kursi pantri yang kosong. Begitu ada panggilan baru (status kembali kerja), ia langsung kembali ke meja.
 - **Chat Master di /kantor:**
-  - panel lebih lebar (minimal sekitar 700px, tetap muat di layar kecil);
+  - tampil seperti aplikasi Windows ala Microsoft Teams: bilah judul dengan tombol ─ □ ✕ (kecilkan, maksimalkan, tutup), rel kiri (Aktivitas, Chat, Riwayat, Daftar), daftar chat beravatar dengan titik status, kepala percakapan, gelembung pesan, dan kotak ketik ala Teams;
+  - panel lebih lebar (minimal sekitar 880px, tetap muat di layar kecil);
   - daftar tujuan pindah ke kolom kiri yang vertikal: CEO, Lead saja, lalu sesi tidur. Fork disaring lewat field `induk`;
   - fork tetap bisa dihubungi lewat tombol **Kirim pesan ke sesi ini** di panel detail pegawai, lalu tampil sebagai "Fork terpilih";
   - chip saran membungkus ke baris baru, tanpa scroll horizontal.

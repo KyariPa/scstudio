@@ -986,6 +986,14 @@ def proses_hidup(pid, mulai=None):
         return False
 
 
+def proses_pembantu(cwd):
+    # proses `claude -p` milik desa (kurir kilat, ringkasan gelembung Haiku, saran AI, ping pemakaian) berjalan di folder
+    # desa-master/<nama> dan ikut terdaftar di registry sesi; tandai supaya tidak muncul sebagai sesi kerja / tujuan chat.
+    c = os.path.normcase(os.path.normpath(cwd))
+    akar = os.path.normcase(os.path.normpath(os.path.join(CLAUDE_DIR, 'desa-master')))
+    return c != os.path.normcase(os.path.normpath(MASTER_DIR)) and (c == akar or c.startswith(akar + os.sep))
+
+
 def registry_hidup():
     # sesi Claude yg prosesnya MASIH HIDUP: [{'sid', 'nama', 'status' (sibuk/siap), 'update', 'master'}], cache 5 dtk.
     # Dipakai chip tujuan Chat Master DAN status/nama sesi Lead di daftar desa (supaya keduanya selalu sama).
@@ -1003,7 +1011,7 @@ def registry_hidup():
         out.append({'sid': str(d.get('sessionId') or ''), 'nama': nama.strip()[:80],
                     'status': 'sibuk' if d.get('status') == 'busy' else 'siap', 'update': (d.get('updatedAt') or 0) / 1000,
                     'master': bool(d.get('cwd')) and os.path.normcase(os.path.normpath(d['cwd'])) == os.path.normcase(MASTER_DIR),
-                    'kurir': bool(d.get('cwd')) and os.path.normcase(os.path.normpath(d['cwd'])) == os.path.normcase(KURIR_DIR)})
+                    'kurir': bool(d.get('cwd')) and proses_pembantu(d['cwd'])})   # kurir kilat, ringkasan Haiku, saran, ping: bukan sesi kerja
     _sesi_tujuan['waktu'], _sesi_tujuan['data'] = time.time(), out
     return out
 
