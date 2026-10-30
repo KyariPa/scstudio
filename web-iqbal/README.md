@@ -25,6 +25,13 @@ python -m http.server 8000
 
 Lalu buka http://localhost:8000. Pada kunjungan pertama, buat akun admin. Sistem otomatis membuat 5 kode undangan.
 
+## Tampilan
+
+- Font Plus Jakarta Sans dimuat dari Google Fonts. Tanpa internet, tampilan jatuh ke font sistem.
+- Mode gelap mengikuti pengaturan sistem. Tombol bulan/matahari di kepala halaman menggantinya, dan pilihan itu diingat di `localStorage` browser.
+- Token warna ada di `:root` pada `css/style.css` (coklat `--merek`, emas `--emas`, status hijau/kuning/merah). Mode gelap mengisi ulang token yang sama.
+- Responsif sampai lebar 375px. Di layar sempit, tabel admin berubah menjadi kartu.
+
 ## AI
 
 - Isi API key OpenAI di **Pengaturan** (menu admin). Model default `gpt-4o` dan bisa diganti.
