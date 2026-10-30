@@ -161,6 +161,8 @@ li { margin-bottom: .25em; }
 .pengisi { flex: 1; }
 .pengguna { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 .nama-pengguna { display: flex; flex-direction: column; line-height: 1.2; text-align: right; font-weight: 600; font-size: .88rem; }
+.nama-pengguna { min-width: 0; max-width: 200px; }
+.nama-teks { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nama-pengguna small { font-weight: 500; font-size: .72rem; opacity: .65; }
 .pengguna .tombol-tipis { color: var(--kepala-tinta); border-color: rgba(255, 255, 255, .28); }
 .pengguna .tombol-tipis:hover { background: rgba(255, 255, 255, .1); }
@@ -467,7 +469,7 @@ code { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-siz
 }
 .profil-atas > div { min-width: 0; overflow-wrap: anywhere; }
 .profil-atas h1 { margin: 0; font-size: 1.5rem; }
-.judul-halaman h1, .langkah-isi, .nama-pengguna { overflow-wrap: anywhere; }
+.judul-halaman h1, .langkah-isi { overflow-wrap: anywhere; }
 .profil-atas p { margin: 2px 0 0; }
 .meta-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 16px; margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--garis); }
 .meta-grid dt { font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--redup); }

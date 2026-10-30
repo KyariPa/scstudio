@@ -197,7 +197,7 @@ function renderKepala(path) {
       <a class="merek" href="#/"><span class="lambang" aria-hidden="true">SB</span><span class="merek-teks">Seleksi Bhayangkara<small>Prototipe</small></span></a>
       ${nav ? `<nav aria-label="Menu utama"${saya.role === 'admin' ? '' : ' class="nav-tunggal"'}>${nav}</nav>` : '<span class="pengisi"></span>'}
       <div class="pengguna">
-        ${saya ? `<span class="nama-pengguna">${esc(saya.nama)}<small>${saya.role === 'admin' ? 'Admin' : 'Pendaftar'}</small></span>` : ''}
+        ${saya ? `<span class="nama-pengguna"><span class="nama-teks" title="${esc(saya.nama)}">${esc(saya.nama)}</span><small>${saya.role === 'admin' ? 'Admin' : 'Pendaftar'}</small></span>` : ''}
         <button class="tombol-ikon" id="tema" type="button" aria-label="Ganti mode terang atau gelap" title="Mode terang/gelap">${ikonTema()}</button>
         ${saya ? '<button class="tombol tombol-tipis" id="keluar">Keluar</button>' : ''}
       </div>
