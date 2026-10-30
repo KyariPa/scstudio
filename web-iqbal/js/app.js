@@ -70,7 +70,9 @@ function gantiTema() {
 
 const LABEL_STATUS = { hijau: 'Hijau · Aman', kuning: 'Kuning · Perlu dicek', merah: 'Merah · Indikasi berat' };
 const lencana = s => (s ? `<span class="lencana lencana-${esc(s)}">${esc(LABEL_STATUS[s] || s)}</span>` : '<span class="redup">-</span>');
-const labelMode = h => (h?.mode === 'demo' ? '<span class="lencana lencana-demo">DEMO · bukan AI</span>' : h?.model ? `<span class="redup kecil">${esc(h.model)}</span>` : '');
+const labelMode = h => (h?.mode === 'demo' ? '<span class="lencana lencana-demo">DEMO · bukan AI</span>'
+  : h?.mode === 'agen' ? `<span class="lencana lencana-prototipe">AI agent IG${h.model ? ` · ${esc(h.model)}` : ''}</span>`
+  : h?.model ? `<span class="redup kecil">${esc(h.model)}</span>` : '');
 
 function urutanOpsi(id) {
   let h = 2166136261;
@@ -729,6 +731,37 @@ function blokGagal(h, jenis) {
   return '';
 }
 
+// Tugas agen IG yang sedang berjalan per pendaftar (userId -> id tugas). Pemantauan tetap jalan walau admin pindah halaman.
+const tugasAgen = {};
+
+async function pantauAgen(userId, idt) {
+  const tampil = teks => { const el = document.getElementById('agenLangkah'); if (el && location.hash.endsWith(userId)) el.textContent = teks; };
+  let t;
+  for (;;) {
+    await new Promise(r => setTimeout(r, 3000));
+    try {
+      t = await AI.agen(`/tugas/${idt}`);
+    } catch (err) {
+      tampil(err.message);
+      continue; // agen mungkin sedang dimulai ulang; coba lagi
+    }
+    if (t.status === 'selesai' || t.status === 'gagal') break;
+    tampil(t.status === 'antre' && t.posisi > 1 ? `Antre, posisi ${t.posisi}. ${t.langkah}` : t.langkah);
+  }
+  delete tugasAgen[userId];
+  if (t.status === 'selesai') {
+    const a = await ambilApp(userId);
+    const h = t.hasil;
+    a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: 'agen', model: h.model, postingan: h.postingan, data: h.data };
+    await simpanApp(a);
+    await analisisAkhirJikaSiap(userId);
+    toast('AI agent selesai memeriksa Instagram.', 'sukses');
+  } else {
+    toast(`AI agent gagal: ${t.error || 'tidak diketahui'}`, 'gagal');
+  }
+  if (location.hash === `#/admin/p/${userId}`) viewAdminDetail(userId);
+}
+
 // Panel detail yang sedang terbuka, diingat saat halaman detail digambar ulang (analisis ulang, simpan keputusan).
 const panelTerbuka = new Set(['akhir', 'keputusan']);
 
@@ -797,9 +830,18 @@ async function viewAdminDetail(userId) {
           ${so.data.temuan.map(t => `<tr><td data-label="Kategori"><b>${esc(t.kategori)}</b></td><td data-label="Temuan">${esc(t.deskripsi)}</td><td data-label="Sumber" class="pecah">${/^https?:\/\//.test(t.sumber) ? `<a href="${esc(t.sumber)}" target="_blank" rel="noopener noreferrer">${esc(t.sumber)}</a>` : esc(t.sumber)}</td><td data-label="Tingkat"><span class="tingkat tingkat-${esc(t.tingkat)}">${esc(t.tingkat)}</span></td></tr>`).join('')}
         </tbody></table></div>` : '<p>Tidak ada temuan.</p>'}
         <p><b>Keterbatasan:</b> ${esc(so.data.keterbatasan)}</p>
+        ${so.postingan?.length ? `<details><summary>Postingan yang dibaca agen (${so.postingan.length})</summary><ul>${so.postingan.map(p => `<li class="pecah"><a href="${/^https:\/\/www\.instagram\.com\//.test(p.url) ? esc(p.url) : '#'}" target="_blank" rel="noopener noreferrer">${p.tanggal ? tgl(p.tanggal) : 'Postingan'}</a>${p.caption ? `: ${esc(p.caption)}` : ''}</li>`).join('')}</ul></details>` : ''}
         ${so.sumber?.length ? `<details><summary>Sumber web yang ditelusuri AI (${so.sumber.length})</summary><ul>${so.sumber.map(x => `<li class="pecah">${/^https?:\/\//.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.judul)}</a>` : esc(x.judul)}</li>`).join('')}</ul></details>` : ''}`}
       <p class="redup kecil">Verifikasi sendiri setiap temuan sebelum mengambil keputusan. Username yang sama bisa dipakai orang lain.</p>
-      <button class="tombol tombol-tipis" data-ulang="sosmed">Analisis ulang media sosial</button>`);
+      <button class="tombol tombol-tipis" data-ulang="sosmed">Analisis ulang media sosial</button>
+      ${s.instagram ? `
+      <div class="kotak-agen">
+        <p><b>AI agent Instagram (demo).</b> Agen membuka akun ${esc(s.instagram)} memakai akun IG panitia, membaca postingan terbaru, lalu Claude menilainya.</p>
+        <div class="baris-tombol">
+          <button class="tombol" type="button" id="periksaAgen"${tugasAgen[userId] ? ' disabled' : ''}>Periksa IG dengan AI agent</button>
+          <span class="redup kecil" id="agenLangkah">${tugasAgen[userId] ? 'Sedang diperiksa...' : ''}</span>
+        </div>
+      </div>` : ''}`);
 
   const kp = a.keputusan;
   const chipKeputusan = kp ? `<span class="chip ${kp.status === 'disetujui' ? 'chip-setuju' : 'chip-tolak'}">${kp.status === 'disetujui' ? 'Disetujui' : 'Ditolak'}</span>` : tahap(a) === 'selesai' ? '<span class="chip chip-tunggu">Menunggu keputusan</span>' : '<span class="chip">Belum bisa diputuskan</span>';
@@ -843,6 +885,19 @@ async function viewAdminDetail(userId) {
     if (d.open) panelTerbuka.add(d.dataset.panel);
     else panelTerbuka.delete(d.dataset.panel);
   }));
+
+  document.getElementById('periksaAgen')?.addEventListener('click', async e => {
+    const b = e.currentTarget;
+    b.disabled = true;
+    try {
+      const { id } = await AI.agen('/periksa', { username: s.instagram });
+      tugasAgen[userId] = id;
+      pantauAgen(userId, id);
+    } catch (err) {
+      toast(err.message, 'gagal');
+      b.disabled = false;
+    }
+  });
 
   app.querySelectorAll('[data-ulang]').forEach(b => b.addEventListener('click', async () => {
     const jenis = b.dataset.ulang;
@@ -952,6 +1007,18 @@ async function viewPengaturan() {
         </div>
       </form>
     </section>
+    <section class="kartu">
+      <h2>AI agent Instagram (demo)</h2>
+      <p class="redup">Server kecil di PC ini (<code>python agen/server.py</code>) membuka Instagram memakai akun panitia, lalu membaca postingan pendaftar untuk dinilai Claude. Hanya untuk demo: akses otomatis dengan akun login melanggar aturan Meta dan akun bisa dibatasi.</p>
+      <form id="fAgen">
+        <label>Alamat agen<input name="agenUrl" value="${esc(st.agenUrl)}" required spellcheck="false"></label>
+      </form>
+      <p class="kecil">Status: <b id="statusAgen">memeriksa...</b></p>
+      <div class="baris-tombol">
+        <button class="tombol" type="button" id="loginAgen">Login Instagram agen</button>
+        <button class="tombol tombol-tipis" type="button" id="cekAgen">Cek status</button>
+      </div>
+    </section>
     <section class="kartu bahaya">
       <h2>Hapus semua data</h2>
       <p class="redup">Menghapus semua akun, kode, jawaban, screenshot, dan pengaturan di browser ini.</p>
@@ -963,8 +1030,36 @@ async function viewPengaturan() {
     await DB.put('kv', {
       apiKey: f.get('apiKey').trim(), model: f.get('model').trim(),
       webSearch: f.get('webSearch') === 'on', tampilkanRingkasanKePendaftar: f.get('tampil') === 'on',
+      agenUrl: new FormData(document.getElementById('fAgen')).get('agenUrl').trim(),
     }, 'settings');
   };
+  const cekAgen = async () => {
+    const el = document.getElementById('statusAgen');
+    if (!el) return null;
+    try {
+      const s = await AI.agen('/status');
+      el.textContent = s.login ? `Terhubung, sudah login Instagram (jeda antar-akun ${s.jedaAkun} detik)` : 'Terhubung, belum login Instagram';
+      return s;
+    } catch (e) {
+      el.textContent = e.message;
+      return null;
+    }
+  };
+  cekAgen();
+  document.getElementById('cekAgen').addEventListener('click', async () => { await simpan(); cekAgen(); });
+  document.getElementById('loginAgen').addEventListener('click', async () => {
+    await simpan();
+    try {
+      await AI.agen('/login', {});
+      toast('Jendela Chromium agen terbuka. Login Instagram di jendela itu.', 'sukses');
+    } catch (e) {
+      return toast(e.message, 'gagal');
+    }
+    for (let i = 0; i < 200 && document.getElementById('statusAgen'); i++) { // pantau sampai 10 menit selama halaman ini terbuka
+      await new Promise(r => setTimeout(r, 3000));
+      if ((await cekAgen())?.login) return toast('Agen sudah login Instagram.', 'sukses');
+    }
+  });
   form.addEventListener('submit', async e => { e.preventDefault(); await simpan(); toast('Pengaturan disimpan.', 'sukses'); });
   document.getElementById('tes').addEventListener('click', async () => {
     await simpan();

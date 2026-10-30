@@ -551,6 +551,8 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
 .unggah-ikon { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; background: var(--emas-lembut); color: var(--emas-tinta); margin-bottom: 4px; }
 .unggah-ikon svg { width: 22px; height: 22px; }
 
+.kotak-agen { margin-top: 16px; padding: 14px 16px; border: 1px dashed var(--emas); border-radius: var(--radius-kecil); background: var(--emas-lembut); }
+.kotak-agen p { margin-bottom: 10px; }
 .peringatan { background: var(--kuning-latar); color: var(--kuning); border: 1px solid var(--kuning-garis); padding: 10px 12px; border-radius: var(--radius-kecil); }
 .galat { background: var(--merah-latar); color: var(--merah); border: 1px solid var(--merah-garis); padding: 10px 12px; border-radius: var(--radius-kecil); }
 

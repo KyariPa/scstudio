@@ -4,7 +4,7 @@
 // Dipanggil dengan fetch biasa (bukan SDK) karena prototipe ini sengaja tanpa npm dan tanpa build.
 
 const AI = (() => {
-  const DEFAULT = { apiKey: '', model: 'claude-opus-5-5', webSearch: true, tampilkanRingkasanKePendaftar: true };
+  const DEFAULT = { apiKey: '', model: 'claude-opus-5-5', webSearch: true, tampilkanRingkasanKePendaftar: true, agenUrl: 'http://localhost:8001' };
   const STATUS = ['hijau', 'kuning', 'merah'];
   // Model yang menerima fallback otomatis di server saat klasifikasi keamanan menolak permintaan.
   const MODEL_FALLBACK = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'];
@@ -279,5 +279,26 @@ Skema JSON:
     return json;
   }
 
-  return { pengaturan, psikotes, sosmed, akhir, tesKoneksi };
+  // ---------- Agen IG (demo, server lokal agen/server.py) ----------
+
+  // GET bila isi tidak diberikan, POST JSON bila ada. API key dan model ikut dikirim agar agen memakai pengaturan yang sama.
+  async function agen(jalur, isi) {
+    const st = await pengaturan();
+    const opsi = isi === undefined ? {} : {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(st.apiKey ? { 'X-Api-Key': st.apiKey } : {}) },
+      body: JSON.stringify({ ...isi, model: st.model }),
+    };
+    let res;
+    try {
+      res = await fetch(st.agenUrl.replace(/\/$/, '') + jalur, opsi);
+    } catch {
+      throw new Error(`Agen IG tidak bisa dihubungi di ${st.agenUrl}. Jalankan: python agen/server.py`);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  return { pengaturan, psikotes, sosmed, akhir, tesKoneksi, agen };
 })();
