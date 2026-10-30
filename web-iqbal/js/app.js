@@ -398,7 +398,7 @@ async function viewPersetujuan() {
           <li>Jawaban psikotes beserta alasan yang Anda tulis.</li>
           <li>Akun media sosial, email, dan screenshot yang Anda lampirkan, termasuk penelusuran jejak publiknya.</li>
         </ul>
-        <div class="kotak-info"><p>Data dianalisis dengan bantuan AI (layanan OpenAI) untuk membuat rangkuman. <strong>AI tidak memutuskan.</strong> Keputusan akhir dibuat oleh panitia setelah memeriksa bukti.</p></div>
+        <div class="kotak-info"><p>Data dianalisis dengan bantuan AI (Claude dari Anthropic) untuk membuat rangkuman. <strong>AI tidak memutuskan.</strong> Keputusan akhir dibuat oleh panitia setelah memeriksa bukti.</p></div>
         <p>Sesuai UU No. 27 Tahun 2022 tentang Pelindungan Data Pribadi, Anda berhak meminta akses, perbaikan, dan penghapusan data Anda, serta menarik persetujuan ini.</p>
         <p class="redup">Catatan prototipe: data disimpan di browser ini saja dan belum ada kebijakan retensi resmi.</p>
       </div>
@@ -797,7 +797,7 @@ async function viewAdminDetail(userId) {
           ${so.data.temuan.map(t => `<tr><td data-label="Kategori"><b>${esc(t.kategori)}</b></td><td data-label="Temuan">${esc(t.deskripsi)}</td><td data-label="Sumber" class="pecah">${/^https?:\/\//.test(t.sumber) ? `<a href="${esc(t.sumber)}" target="_blank" rel="noopener noreferrer">${esc(t.sumber)}</a>` : esc(t.sumber)}</td><td data-label="Tingkat"><span class="tingkat tingkat-${esc(t.tingkat)}">${esc(t.tingkat)}</span></td></tr>`).join('')}
         </tbody></table></div>` : '<p>Tidak ada temuan.</p>'}
         <p><b>Keterbatasan:</b> ${esc(so.data.keterbatasan)}</p>
-        ${so.sumber?.length ? `<details><summary>Sumber web yang dibuka AI (${so.sumber.length})</summary><ul>${so.sumber.map(x => `<li class="pecah"><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.judul)}</a></li>`).join('')}</ul></details>` : ''}`}
+        ${so.sumber?.length ? `<details><summary>Sumber web yang ditelusuri AI (${so.sumber.length})</summary><ul>${so.sumber.map(x => `<li class="pecah">${/^https?:\/\//.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.judul)}</a>` : esc(x.judul)}</li>`).join('')}</ul></details>` : ''}`}
       <p class="redup kecil">Verifikasi sendiri setiap temuan sebelum mengambil keputusan. Username yang sama bisa dipakai orang lain.</p>
       <button class="tombol tombol-tipis" data-ulang="sosmed">Analisis ulang media sosial</button>`);
 
@@ -936,14 +936,14 @@ async function viewPengaturan() {
       </div>
     </header>
     <section class="kartu">
-      <h2>Analisis AI (OpenAI)</h2>
+      <h2>Analisis AI (Claude)</h2>
       <p class="redup">Tanpa API key, aplikasi berjalan di <b>mode demo</b>: rangkuman dibuat dengan aturan sederhana, bukan AI.</p>
       <form id="f">
-        <label>API key OpenAI
-          <input name="apiKey" type="password" value="${esc(st.apiKey)}" placeholder="sk-..." autocomplete="off" spellcheck="false"></label>
-        <p class="peringatan kecil">API key disimpan di browser ini saja dan dikirim langsung ke OpenAI. Jangan menaruh key di kode atau commit ke GitHub. Untuk penggunaan sungguhan, panggilan AI wajib dipindah ke server.</p>
+        <label>API key Claude <span class="redup">(dari platform.claude.com)</span>
+          <input name="apiKey" type="password" value="${esc(st.apiKey)}" placeholder="sk-ant-..." autocomplete="off" spellcheck="false"></label>
+        <p class="peringatan kecil">API key disimpan di browser ini saja dan dikirim langsung ke Anthropic. Jangan menaruh key di kode atau commit ke GitHub. Untuk penggunaan sungguhan, panggilan AI wajib dipindah ke server.</p>
         <label>Model<input name="model" value="${esc(st.model)}" required spellcheck="false"></label>
-        <p class="redup kecil">Model harus mendukung gambar dan pencarian web, misalnya gpt-4o.</p>
+        <p class="redup kecil">Model harus mendukung gambar dan pencarian web. Bawaan: claude-opus-5-5. Lebih hemat: claude-sonnet-5-5.</p>
         <label class="centang"><input type="checkbox" name="webSearch" ${st.webSearch ? 'checked' : ''}> Izinkan AI menelusuri web untuk cek media sosial</label>
         <label class="centang"><input type="checkbox" name="tampil" ${st.tampilkanRingkasanKePendaftar ? 'checked' : ''}> Tampilkan rangkuman psikotes ke pendaftar</label>
         <div class="baris-tombol">
@@ -968,7 +968,7 @@ async function viewPengaturan() {
   form.addEventListener('submit', async e => { e.preventDefault(); await simpan(); toast('Pengaturan disimpan.', 'sukses'); });
   document.getElementById('tes').addEventListener('click', async () => {
     await simpan();
-    const tutup = sibuk('Menghubungi OpenAI...');
+    const tutup = sibuk('Menghubungi Claude...');
     try { await AI.tesKoneksi(); toast('Koneksi berhasil.', 'sukses'); } catch (e) { toast(`Gagal: ${e.message}`, 'gagal'); } finally { tutup(); }
   });
   document.getElementById('reset').addEventListener('click', async () => {

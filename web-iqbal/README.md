@@ -34,9 +34,10 @@ Lalu buka http://localhost:8000. Pada kunjungan pertama, buat akun admin. Sistem
 
 ## AI
 
-- Isi API key OpenAI di **Pengaturan** (menu admin). Model default `gpt-4o` dan bisa diganti.
+- AI memakai **Claude** dari Anthropic. Buat API key di [platform.claude.com](https://platform.claude.com/), lalu isi di **Pengaturan** (menu admin). Model default `claude-opus-5-5`; `claude-sonnet-5-5` lebih hemat.
 - Tanpa API key, aplikasi berjalan di **mode demo**: rangkuman dibuat dengan aturan sederhana dan diberi label `DEMO`. Untuk mencoba status merah/kuning di mode demo, isi username yang memuat kata seperti `sajam` atau `miras`.
-- Panggilan memakai OpenAI Responses API (`/v1/responses`) dengan tool `web_search`. Jika akun/model belum mendukungnya, aplikasi mencoba `web_search_preview`.
+- Panggilan memakai Claude Messages API (`/v1/messages`, versi `2026-10-21`) dengan screenshot sebagai gambar dan tool `web_search_20260209` (model lama otomatis memakai `web_search_20250305`). Effort `high`; untuk model Opus/Sonnet terbaru, fallback otomatis saat permintaan ditolak klasifikasi keamanan (`fallbacks: "default"`).
+- Dipanggil dengan `fetch` biasa, bukan SDK, karena prototipe ini tanpa npm dan tanpa build. Header `anthropic-dangerous-direct-browser-access` mengizinkan panggilan dari browser; itu hanya untuk prototipe.
 
 ## Keterbatasan yang perlu diketahui
 
@@ -54,5 +55,5 @@ Lalu buka http://localhost:8000. Pada kunjungan pertama, buat akun admin. Sistem
 | `css/style.css` | Tampilan |
 | `js/db.js` | Penyimpanan IndexedDB |
 | `js/soal.js` | 12 karakter dan 60 soal beserta skornya |
-| `js/ai.js` | Prompt dan panggilan OpenAI, plus mode demo |
+| `js/ai.js` | Prompt dan panggilan Claude API, plus mode demo |
 | `js/app.js` | Routing, akun, psikotes, media sosial, panel admin |

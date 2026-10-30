@@ -1,13 +1,18 @@
 'use strict';
-// Analisis AI lewat OpenAI Responses API. Tanpa API key, analisis jatuh ke mode DEMO (aturan sederhana, bukan AI).
+// Analisis AI lewat Claude Messages API (Anthropic). Tanpa API key, analisis jatuh ke mode DEMO (aturan sederhana, bukan AI).
 // Catatan: memanggil API langsung dari browser hanya layak untuk prototipe. Versi produksi wajib lewat server.
+// Dipanggil dengan fetch biasa (bukan SDK) karena prototipe ini sengaja tanpa npm dan tanpa build.
 
 const AI = (() => {
-  const DEFAULT = { apiKey: '', model: 'gpt-4o', webSearch: true, tampilkanRingkasanKePendaftar: true };
+  const DEFAULT = { apiKey: '', model: 'claude-opus-5-5', webSearch: true, tampilkanRingkasanKePendaftar: true };
   const STATUS = ['hijau', 'kuning', 'merah'];
+  // Model yang menerima fallback otomatis di server saat klasifikasi keamanan menolak permintaan.
+  const MODEL_FALLBACK = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'];
 
   async function pengaturan() {
-    return { ...DEFAULT, ...((await DB.get('kv', 'settings')) || {}) };
+    const st = { ...DEFAULT, ...((await DB.get('kv', 'settings')) || {}) };
+    if (/^gpt|^o\d/i.test(st.model)) st.model = DEFAULT.model; // sisa pengaturan zaman OpenAI
+    return st;
   }
 
   const ATURAN = `Aturan wajib:
@@ -18,11 +23,15 @@ const AI = (() => {
 - Balas HANYA dengan satu objek JSON sesuai skema, tanpa teks lain dan tanpa blok kode.`;
 
   async function kirim(st, body) {
-    const res = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${st.apiKey}` },
-      body: JSON.stringify(body),
-    });
+    const headers = {
+      'Content-Type': 'application/json',
+      'x-api-key': st.apiKey,
+      'anthropic-version': '2026-10-21',
+      // Wajib agar Anthropic mengizinkan panggilan langsung dari browser (hanya untuk prototipe).
+      'anthropic-dangerous-direct-browser-access': 'true',
+    };
+    if (body.fallbacks) headers['anthropic-beta'] = 'server-side-fallback-2026-07-01';
+    const res = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', headers, body: JSON.stringify(body) });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(data?.error?.message || `HTTP ${res.status}`);
@@ -32,31 +41,49 @@ const AI = (() => {
     return data;
   }
 
+  const ALAT_WEB = { baru: 'web_search_20260209', lama: 'web_search_20250305' };
+
   async function panggil(st, { instructions, content, webSearch = false }) {
-    const body = { model: st.model, instructions, input: [{ role: 'user', content }] };
-    if (webSearch) body.tools = [{ type: 'web_search' }];
+    const body = {
+      model: st.model,
+      max_tokens: 16000,
+      system: instructions,
+      output_config: { effort: 'high' },
+      messages: [{ role: 'user', content }],
+    };
+    if (MODEL_FALLBACK.includes(st.model)) body.fallbacks = 'default';
+    if (webSearch) body.tools = [{ type: ALAT_WEB.baru, name: 'web_search', max_uses: 8 }];
+
     let data;
-    try {
-      data = await kirim(st, body);
-    } catch (e) {
-      // Sebagian model/akun hanya mengenal nama tool lama.
-      if (!webSearch || e.status !== 400 || !/web_search/i.test(e.message)) throw e;
-      body.tools = [{ type: 'web_search_preview' }];
-      data = await kirim(st, body);
+    // Web search berjalan di server Anthropic; "pause_turn" berarti putaran belum selesai dan perlu dilanjutkan.
+    for (let putaran = 0; putaran < 5; putaran++) {
+      try {
+        data = await kirim(st, body);
+      } catch (e) {
+        // Model lama hanya mengenal versi tool web search yang lama.
+        if (!webSearch || e.status !== 400 || !e.message.includes(ALAT_WEB.baru)) throw e;
+        body.tools = [{ type: ALAT_WEB.lama, name: 'web_search', max_uses: 8 }];
+        data = await kirim(st, body);
+      }
+      if (data.stop_reason !== 'pause_turn') break;
+      body.messages = [...body.messages.slice(0, 1), { role: 'assistant', content: data.content }];
     }
+    if (data.stop_reason === 'refusal') {
+      throw new Error(`Claude menolak memproses permintaan ini${data.stop_details?.category ? ` (kategori: ${data.stop_details.category})` : ''}.`);
+    }
+    if (data.stop_reason === 'max_tokens') throw new Error('Jawaban AI terpotong (batas token). Coba analisis ulang.');
+
     let teks = '';
     const sumber = [];
-    for (const item of data.output || []) {
-      if (item.type !== 'message') continue;
-      for (const c of item.content || []) {
-        if (c.type !== 'output_text') continue;
-        teks += c.text;
-        for (const a of c.annotations || []) {
-          if (a.type === 'url_citation' && a.url && !sumber.some(s => s.url === a.url)) sumber.push({ url: a.url, judul: a.title || a.url });
-        }
+    const tambahSumber = (url, judul) => { if (url && !sumber.some(s => s.url === url)) sumber.push({ url, judul: judul || url }); };
+    for (const b of data.content || []) {
+      if (b.type === 'text') {
+        teks += b.text;
+        for (const c of b.citations || []) tambahSumber(c.url, c.title);
+      } else if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) {
+        for (const r of b.content) tambahSumber(r.url, r.title);
       }
     }
-    if (!teks && typeof data.output_text === 'string') teks = data.output_text;
     return { json: ambilJson(teks), sumber };
   }
 
@@ -94,7 +121,7 @@ const AI = (() => {
 ${ATURAN}
 Skema JSON:
 {"ringkasan_karakter":"3-5 kalimat","kekuatan":["..."],"area_perhatian":["..."],"konsistensi":"1-3 kalimat, sebut ID soal yang janggal bila ada","catatan_dimensi":[{"kode":"BRA","catatan":"1 kalimat"}],"kesesuaian":"tinggi|sedang|rendah"}`,
-      content: [{ type: 'input_text', text: teksPsikotes(app.psikotes) }],
+      content: [{ type: 'text', text: teksPsikotes(app.psikotes) }],
     });
     return {
       mode: 'ai',
@@ -141,10 +168,13 @@ ${webSearch ? 'Gunakan pencarian web untuk menelusuri jejak publik akun dan emai
   async function sosmed(app, user, gambar) {
     const st = await pengaturan();
     if (!st.apiKey) return { mode: 'demo', data: demoSosmed(app.sosmed) };
-    const content = [{ type: 'input_text', text: teksSosmed(user, app.sosmed, gambar.length, st.webSearch) }];
+    const content = [{ type: 'text', text: teksSosmed(user, app.sosmed, gambar.length, st.webSearch) }];
     gambar.forEach((g, i) => {
-      content.push({ type: 'input_text', text: `Screenshot ${i + 1}:` });
-      content.push({ type: 'input_image', image_url: g.dataUrl });
+      // dataUrl berbentuk "data:image/jpeg;base64,...." (hasil kecilkanGambar di app.js).
+      const [, mediaType, data] = g.dataUrl.match(/^data:(image\/[a-z+]+);base64,(.*)$/) || [];
+      if (!data) return;
+      content.push({ type: 'text', text: `Screenshot ${i + 1}:` });
+      content.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data } });
     });
     const { json, sumber } = await panggil(st, {
       webSearch: st.webSearch,
@@ -194,7 +224,7 @@ Skema JSON:
       ringkasan: 'Mode demo: tidak ada pemeriksaan media sosial sungguhan. Status ditentukan dari kata kunci pada username dan tautan saja.',
       cakupan: 'Hanya teks yang diisi pendaftar.',
       temuan,
-      keterbatasan: 'Isi API key OpenAI di menu Pengaturan untuk analisis screenshot dan pencarian web.',
+      keterbatasan: 'Isi API key Claude di menu Pengaturan untuk analisis screenshot dan pencarian web.',
     };
   }
 
@@ -211,7 +241,7 @@ Status akhir: "hijau" = layak dilanjutkan, "kuning" = perlu klarifikasi atau waw
 ${ATURAN}
 Skema JSON:
 {"status":"hijau|kuning|merah","ringkasan":"3-5 kalimat","alasan":["..."],"rekomendasi_admin":"1-3 kalimat","pertanyaan_wawancara":["3-5 pertanyaan klarifikasi"]}`,
-      content: [{ type: 'input_text', text: `HASIL PSIKOTES (skor total ${app.psikotes.total}%):\n${JSON.stringify(ps, null, 1)}\n\nHASIL MEDIA SOSIAL:\n${JSON.stringify(so, null, 1)}` }],
+      content: [{ type: 'text', text: `HASIL PSIKOTES (skor total ${app.psikotes.total}%):\n${JSON.stringify(ps, null, 1)}\n\nHASIL MEDIA SOSIAL:\n${JSON.stringify(so, null, 1)}` }],
     });
     return {
       mode: 'ai',
@@ -244,7 +274,7 @@ Skema JSON:
     if (!st.apiKey) throw new Error('API key belum diisi.');
     const { json } = await panggil(st, {
       instructions: 'Balas hanya dengan JSON {"ok":true}.',
-      content: [{ type: 'input_text', text: 'tes' }],
+      content: [{ type: 'text', text: 'tes' }],
     });
     return json;
   }
