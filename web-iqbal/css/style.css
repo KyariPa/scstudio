@@ -573,6 +573,10 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
 /* ---------- Responsif ---------- */
 
 @media (max-width: 860px) {
+  .nama-pengguna { display: none; }
+  #kepala nav { overflow-x: auto; scrollbar-width: none; gap: 2px; }
+  #kepala nav a { padding: 7px 9px; }
+  .kepala-isi { column-gap: 12px; }
   .auth { grid-template-columns: 1fr; gap: 18px; }
   .auth-form { order: -1; }
   .statistik { grid-template-columns: repeat(3, 1fr); }
