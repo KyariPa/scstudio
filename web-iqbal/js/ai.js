@@ -5,7 +5,7 @@
 
 const AI = (() => {
   const DEFAULT = { apiKey: '', model: 'claude-opus-5-5', webSearch: true, tampilkanRingkasanKePendaftar: true, agenUrl: 'http://localhost:8001',
-    apifyToken: '', apifyMaks: 50 };
+    apifyToken: '', apifyMaks: 50, apifyOtomatis: false };
   const STATUS = ['hijau', 'kuning', 'merah'];
   // Model yang menerima fallback otomatis di server saat klasifikasi keamanan menolak permintaan.
   const MODEL_FALLBACK = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'];

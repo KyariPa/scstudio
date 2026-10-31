@@ -651,6 +651,9 @@ async function viewSosmed() {
     await analisis(saya.id, 'sosmed');
     await analisisAkhirJikaSiap(saya.id);
     tutup();
+    // Cek IG otomatis (bila diaktifkan admin) berjalan diam-diam di latar; pendaftar tidak diberi tahu.
+    const st = await AI.pengaturan();
+    if (st.apifyOtomatis && st.apifyToken && isian.instagram) antrekanCekIG([{ userId: saya.id, instagram: isian.instagram }], true);
     toast('Data terkirim. Panitia akan meninjau hasil Anda.', 'sukses');
     pergi('/beranda');
   });
@@ -665,9 +668,35 @@ function teksTahap(a) {
   return { persetujuan: 'Belum mulai', sosmed: 'Mengisi sosmed', selesai: 'Menunggu keputusan' }[t];
 }
 
+// Status pemeriksaan isi IG (agen Chrome atau Apify), terpisah dari cek web search saat pendaftar mengisi sosmed.
+function statusCekIG(userId, a) {
+  if (!a?.sosmed?.instagram) return { kode: 'tanpa', teks: 'Tidak ada IG', kelas: '' };
+  if (tugasAgen[`periksa-apify:${userId}`] || tugasAgen[`periksa:${userId}`]) return { kode: 'jalan', teks: 'Sedang dicek…', kelas: 'chip-tunggu' };
+  const so = a.aiSosmed;
+  if (so?.status === 'ok' && (so.mode === 'apify' || so.mode === 'agen')) {
+    const n = so.data.temuan.length;
+    return {
+      kode: 'sudah', ambigu: n, kelas: n ? 'chip-tunggu' : 'chip-setuju',
+      teks: `Sudah dicek · ${tglPendek(so.waktu)} · ${so.mode === 'apify' ? 'Apify' : 'Agen'} · ${n ? `${n} ambigu` : 'tanpa temuan'}`,
+    };
+  }
+  if (a.cekIGGagal) return { kode: 'gagal', teks: `Gagal: ${a.cekIGGagal.error}`, kelas: 'chip-tolak' };
+  return { kode: 'belum', teks: 'Belum dicek', kelas: '' };
+}
+
 async function viewAdmin() {
   const users = (await DB.all('users')).filter(u => u.role === 'pendaftar');
   const apps = Object.fromEntries((await DB.all('apps')).map(a => [a.userId, a]));
+  const st = await AI.pengaturan();
+  let ig = Object.fromEntries(users.map(u => [u.id, statusCekIG(u.id, apps[u.id])]));
+  // Cek otomatis: pendaftar yang belum pernah dicek langsung masuk antrean (yang gagal tetap menunggu tombol manual).
+  const otomatis = st.apifyOtomatis && st.apifyToken
+    ? users.filter(u => ig[u.id].kode === 'belum').map(u => ({ userId: u.id, instagram: apps[u.id].sosmed.instagram }))
+    : [];
+  if (otomatis.length && await antrekanCekIG(otomatis, true)) {
+    ig = Object.fromEntries(users.map(u => [u.id, statusCekIG(u.id, apps[u.id])]));
+  }
+  const belumIG = users.filter(u => ['belum', 'gagal'].includes(ig[u.id].kode));
   // Warna baris mengikuti rangkuman akhir, atau hasil sosmed jika rangkuman akhir belum ada.
   const warna = a => a?.aiAkhir?.data?.status || a?.aiSosmed?.data?.status || '';
   const menunggu = a => tahap(a) === 'selesai' && !a?.keputusan;
@@ -676,11 +705,13 @@ async function viewAdmin() {
   const baris = users.sort((x, y) => (y.dibuat || '').localeCompare(x.dibuat || '')).map(u => {
     const a = apps[u.id];
     const w = warna(a);
-    return `<tr class="${w ? `baris-${esc(w)}` : ''}" data-warna="${esc(w)}" data-menunggu="${menunggu(a) ? 1 : 0}">
-      <td><a href="#/admin/p/${u.id}"><strong>${esc(u.nama)}</strong></a><div class="redup kecil">${esc(u.email)}</div></td>
+    const s = ig[u.id];
+    return `<tr class="${w ? `baris-${esc(w)}` : ''}" data-warna="${esc(w)}" data-menunggu="${menunggu(a) ? 1 : 0}" data-ig="${s.kode}" data-ambigu="${s.ambigu ? 1 : 0}">
+      <td><a href="#/admin/p/${u.id}"><strong>${esc(u.nama)}</strong></a><div class="redup kecil">${esc(u.email)}${a?.sosmed?.instagram ? ` · ${esc(a.sosmed.instagram)}` : ''}</div></td>
       <td data-label="Tahap"><span class="chip ${kelasTahap(a)}">${esc(teksTahap(a))}</span></td>
       <td data-label="Psikotes">${a?.psikotes?.dikirim ? `<b>${a.psikotes.total}%</b>` : '<span class="redup">-</span>'}</td>
       <td data-label="Sosmed">${lencana(a?.aiSosmed?.data?.status)}</td>
+      <td data-label="Cek IG"><span class="chip ${s.kelas}">${esc(s.teks)}</span></td>
       <td data-label="Akhir">${lencana(a?.aiAkhir?.data?.status)}</td>
     </tr>`;
   }).join('');
@@ -700,15 +731,24 @@ async function viewAdmin() {
       <div class="ubin ubin-merah"><span>Merah · indikasi berat</span><b>${hitung(a => warna(a) === 'merah')}</b></div>
     </div>
     ${users.length ? `
+      <div class="baris-tombol cek-semua">
+        <label class="saklar"><input type="checkbox" id="otoIG" ${st.apifyOtomatis ? 'checked' : ''}> Cek IG otomatis via Apify</label>
+        ${belumIG.length ? `<button type="button" class="tombol" id="cekSemuaIG">Cek IG ${belumIG.length} pendaftar yang belum</button>` : ''}
+        <span class="redup kecil">${st.apifyOtomatis
+          ? (st.apifyToken ? 'Aktif: pendaftar baru langsung dicek di latar tanpa Chrome.' : 'Aktif, tetapi token Apify belum diisi di Pengaturan.')
+          : 'Nonaktif: cek IG hanya lewat tombol.'}</span>
+      </div>
       <div class="saring" role="group" aria-label="Saring pendaftar">
         <button type="button" data-saring="" class="aktif">Semua</button>
         <button type="button" data-saring="menunggu">Menunggu keputusan</button>
         <button type="button" data-saring="merah">Merah</button>
         <button type="button" data-saring="kuning">Kuning</button>
         <button type="button" data-saring="hijau">Hijau</button>
+        <button type="button" data-saring="ig-belum">IG belum dicek</button>
+        <button type="button" data-saring="ambigu">Ada postingan ambigu</button>
       </div>
       <div class="tabel-bungkus tabel-kartu tabel-pendaftar"><table>
-      <thead><tr><th>Nama</th><th>Tahap</th><th>Psikotes</th><th>Sosmed</th><th>Akhir</th></tr></thead>
+      <thead><tr><th>Nama</th><th>Tahap</th><th>Psikotes</th><th>Sosmed</th><th>Cek IG</th><th>Akhir</th></tr></thead>
       <tbody>${baris}</tbody></table></div>
       <p class="redup kecil" id="kosongSaring" hidden>Tidak ada pendaftar untuk saringan ini.</p>`
       : '<div class="kartu keadaan-kosong"><p>Belum ada pendaftar. Bagikan kode undangan dari menu <a href="#/admin/kode">Kode Undangan</a>.</p></div>'}`;
@@ -718,12 +758,48 @@ async function viewAdmin() {
     app.querySelectorAll('[data-saring]').forEach(x => x.classList.toggle('aktif', x === b));
     let tampil = 0;
     app.querySelectorAll('.tabel-pendaftar tbody tr').forEach(tr => {
-      const cocok = !s || (s === 'menunggu' ? tr.dataset.menunggu === '1' : tr.dataset.warna === s);
+      const cocok = !s
+        || (s === 'menunggu' ? tr.dataset.menunggu === '1'
+          : s === 'ig-belum' ? ['belum', 'gagal'].includes(tr.dataset.ig)
+            : s === 'ambigu' ? tr.dataset.ambigu === '1'
+              : tr.dataset.warna === s);
       tr.hidden = !cocok;
       tampil += cocok;
     });
     document.getElementById('kosongSaring').hidden = tampil > 0;
   }));
+
+  document.getElementById('cekSemuaIG')?.addEventListener('click', async e => {
+    e.currentTarget.disabled = true;
+    const jalan = await antrekanCekIG(belumIG.map(u => ({ userId: u.id, instagram: apps[u.id].sosmed.instagram })));
+    if (jalan) toast(`${jalan} akun IG masuk antrean Apify.`, 'sukses');
+    viewAdmin();
+  });
+  document.getElementById('otoIG').addEventListener('change', async e => {
+    const nyala = e.target.checked;
+    await DB.put('kv', { ...(await AI.pengaturan()), apifyOtomatis: nyala }, 'settings');
+    toast(nyala ? 'Cek IG otomatis aktif.' : 'Cek IG otomatis nonaktif.', 'sukses');
+    viewAdmin();
+  });
+}
+
+// Masukkan akun IG ke antrean Apify. diam = true: tanpa notifikasi (dipakai di sisi pendaftar,
+// yang tidak perlu tahu kapan akunnya diperiksa, dan pada cek otomatis).
+async function antrekanCekIG(daftar, diam = false) {
+  const maks = Number((await AI.pengaturan()).apifyMaks) || 50;
+  let jalan = 0;
+  for (const { userId, instagram } of daftar) {
+    try {
+      const { id } = await AI.agen('/periksa-apify', { username: instagram, maks });
+      tugasAgen[`periksa-apify:${userId}`] = id;
+      ikutiTugasAgen('periksa-apify', userId, id, diam);
+      jalan++;
+    } catch (err) {
+      if (!diam) toast(err.message, 'gagal');
+      break;
+    }
+  }
+  return jalan;
 }
 
 function blokGagal(h, jenis) {
@@ -736,9 +812,15 @@ function blokGagal(h, jenis) {
 // Pengikutan tugas tetap jalan walau admin pindah halaman.
 const tugasAgen = {};
 
-const tabelTemuan = temuan => (temuan.length ? `<div class="tabel-bungkus tabel-kartu temuan"><table><thead><tr><th>Kategori</th><th>Temuan</th><th>Sumber</th><th>Tingkat</th></tr></thead><tbody>
-  ${temuan.map(t => `<tr><td data-label="Kategori"><b>${esc(t.kategori)}</b></td><td data-label="Temuan">${esc(t.deskripsi)}</td><td data-label="Sumber" class="pecah">${/^https?:\/\//.test(t.sumber) ? `<a href="${esc(t.sumber)}" target="_blank" rel="noopener noreferrer">${esc(t.sumber)}</a>` : esc(t.sumber)}</td><td data-label="Tingkat"><span class="tingkat tingkat-${esc(t.tingkat)}">${esc(t.tingkat)}</span></td></tr>`).join('')}
-  </tbody></table></div>` : '<p>Tidak ada temuan.</p>');
+// Temuan sebagai daftar postingan ambigu: kategori + tingkat, alasan singkat, lalu link postingannya.
+const daftarTemuan = temuan => (temuan.length ? `
+  <h3>Daftar postingan ambigu (${temuan.length})</h3>
+  <ol class="daftar-ambigu">${temuan.map(t => `
+    <li><b>${esc(t.kategori)}</b> <span class="tingkat tingkat-${esc(t.tingkat)}">${esc(t.tingkat)}</span>
+      <div>${esc(t.deskripsi)}</div>
+      ${/^https?:\/\//.test(t.sumber) ? `<a class="pecah" href="${esc(t.sumber)}" target="_blank" rel="noopener noreferrer">${esc(t.sumber)}</a>` : t.sumber ? `<span class="redup kecil">Sumber: ${esc(t.sumber)}</span>` : ''}
+    </li>`).join('')}
+  </ol>` : '<p><b>Tidak ada postingan ambigu.</b></p>');
 
 const tglPendek = s => { const d = new Date(s); return Number.isNaN(d.getTime()) ? String(s || '-') : d.toLocaleDateString('id-ID', { dateStyle: 'medium' }); };
 const linkIG = url => (/^https:\/\/www\.instagram\.com\//.test(url) ? esc(url) : '#');
@@ -756,7 +838,7 @@ function blokPantau(p) {
       ${daftar(`${p.dihapus.length} postingan terhapus (isi dari snapshot sebelumnya)`, p.dihapus.map(d => `<li>${esc(tglPendek(d.tanggal))}: ${esc(d.caption || '(tanpa caption)')} <span class="redup kecil pecah">${esc(d.url)}</span></li>`), 'galat')}
       ${daftar('Caption diubah', p.berubah.map(d => `<li><a href="${linkIG(d.url)}" target="_blank" rel="noopener noreferrer">postingan</a>: "${esc(d.captionLama || '')}" → "${esc(d.caption || '')}"</li>`), 'peringatan')}
       ${daftar('Postingan baru', p.baru.map(d => `<li><a href="${linkIG(d.url)}" target="_blank" rel="noopener noreferrer">${esc(tglPendek(d.tanggal))}</a>: ${esc(d.caption || '(tanpa caption)')}</li>`))}
-      ${p.data ? `<p>${esc(p.data.ringkasan)}</p>${tabelTemuan(p.data.temuan)}<p class="redup kecil"><b>Keterbatasan:</b> ${esc(p.data.keterbatasan)}</p>` : ''}
+      ${p.data ? `<p>${esc(p.data.ringkasan)}</p>${daftarTemuan(p.data.temuan)}<p class="redup kecil"><b>Keterbatasan:</b> ${esc(p.data.keterbatasan)}</p>` : ''}
     </div>`;
 }
 
@@ -770,7 +852,7 @@ function postinganDikenal(a) {
   return [...peta.values()];
 }
 
-async function ikutiTugasAgen(jenis, userId, idt) {
+async function ikutiTugasAgen(jenis, userId, idt, diam = false) {
   const kunci = `${jenis}:${userId}`;
   const tampil = teks => { const el = document.getElementById(`${jenis}Langkah`); if (el && location.hash.endsWith(userId)) el.textContent = teks; };
   let t;
@@ -790,9 +872,10 @@ async function ikutiTugasAgen(jenis, userId, idt) {
     const a = await ambilApp(userId);
     const h = t.hasil;
     a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: h.mode, model: h.model, postingan: h.postingan, data: h.data };
+    delete a.cekIGGagal;
     await simpanApp(a);
     await analisisAkhirJikaSiap(userId);
-    toast(jenis === 'periksa' ? 'AI agent selesai memeriksa Instagram.' : 'Pemeriksaan via Apify selesai.', 'sukses');
+    if (!diam) toast(jenis === 'periksa' ? 'AI agent selesai memeriksa Instagram.' : 'Pemeriksaan via Apify selesai.', 'sukses');
   } else if (t.status === 'selesai') {
     // Hasil pantau disimpan terpisah supaya tidak menimpa pemeriksaan lengkap agen (yang membaca semua slide).
     const a = await ambilApp(userId);
@@ -807,9 +890,15 @@ async function ikutiTugasAgen(jenis, userId, idt) {
     const ada = h.dihapus.length + h.berubah.length + h.baru.length;
     toast(ada ? `Pemantauan selesai: ${ada} perubahan.` : 'Pemantauan selesai: tidak ada perubahan.', 'sukses');
   } else {
-    toast(`AI agent gagal: ${t.error || 'tidak diketahui'}`, 'gagal');
+    if (jenis !== 'pantau') {
+      const a = await ambilApp(userId);
+      a.cekIGGagal = { waktu: sekarang(), error: t.error || 'tidak diketahui' };
+      await simpanApp(a);
+    }
+    if (!diam) toast(`AI agent gagal: ${t.error || 'tidak diketahui'}`, 'gagal');
   }
   if (location.hash === `#/admin/p/${userId}`) viewAdminDetail(userId);
+  else if (location.hash === '#/admin') viewAdmin();
 }
 
 // Panel detail yang sedang terbuka, diingat saat halaman detail digambar ulang (analisis ulang, simpan keputusan).
@@ -876,7 +965,7 @@ async function viewAdminDetail(userId) {
       ${blokGagal(so) || `
         <p>${esc(so.data.ringkasan)}</p>
         <p><b>Yang diperiksa:</b> ${esc(so.data.cakupan)}</p>
-        ${tabelTemuan(so.data.temuan)}
+        ${daftarTemuan(so.data.temuan)}
         <p><b>Keterbatasan:</b> ${esc(so.data.keterbatasan)}</p>
         ${so.postingan?.length ? `<details><summary>Postingan yang dibaca agen (${so.postingan.length})</summary><ul>${so.postingan.map(p => `<li class="pecah"><a href="${/^https:\/\/www\.instagram\.com\//.test(p.url) ? esc(p.url) : '#'}" target="_blank" rel="noopener noreferrer">${p.tanggal ? tgl(p.tanggal) : 'Postingan'}</a>${p.caption ? `: ${esc(p.caption)}` : ''}</li>`).join('')}</ul></details>` : ''}
         ${so.sumber?.length ? `<details><summary>Sumber web yang ditelusuri AI (${so.sumber.length})</summary><ul>${so.sumber.map(x => `<li class="pecah">${/^https?:\/\//.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.judul)}</a>` : esc(x.judul)}</li>`).join('')}</ul></details>` : ''}`}
@@ -1096,6 +1185,7 @@ async function viewPengaturan() {
           <input name="apifyToken" type="password" value="${esc(st.apifyToken)}" placeholder="apify_api_..." autocomplete="off" spellcheck="false"></label>
         <p class="peringatan kecil">Token disimpan di browser ini saja dan hanya dikirim ke agen lokal, yang meneruskannya ke Apify. Jangan menaruh token di kode atau commit ke GitHub.</p>
         <label>Maksimal postingan per akun<input name="apifyMaks" type="number" min="1" max="200" value="${esc(st.apifyMaks)}"></label>
+        <label class="centang"><input type="checkbox" name="apifyOtomatis" ${st.apifyOtomatis ? 'checked' : ''}> Cek IG otomatis via Apify: pendaftar baru langsung dicek, dan yang belum dicek masuk antrean saat daftar pendaftar dibuka</label>
         <button class="tombol">Simpan</button>
       </form>
     </section>
@@ -1113,6 +1203,7 @@ async function viewPengaturan() {
       agenUrl: new FormData(document.getElementById('fAgen')).get('agenUrl').trim(),
       apifyToken: new FormData(document.getElementById('fApify')).get('apifyToken').trim(),
       apifyMaks: Math.min(Math.max(Number(new FormData(document.getElementById('fApify')).get('apifyMaks')) || 50, 1), 200),
+      apifyOtomatis: new FormData(document.getElementById('fApify')).get('apifyOtomatis') === 'on',
     }, 'settings');
   };
   const cekAgen = async () => {

@@ -44,6 +44,8 @@ Mode ketiga (`agen/apify.py`): penyedia data [Apify](https://apify.com) mengambi
 3. Agen menjalankan actor secara sinkron (maks. ±5 menit per akun), mengunduh foto sampul + maks. 2 slide carousel per postingan (total maks. 90 foto), lalu Claude menilai foto, caption, dan komentar terbaru (komentar akun pendaftar ditandai PENDAFTAR).
 4. Hasil disimpan sebagai hasil media sosial berlabel "Apify", dan pemantauan tanpa login bisa dipakai sesudahnya.
 
+**Daftar pendaftar** menampilkan kolom **Cek IG** (Belum dicek / Sedang dicek / Sudah dicek + tanggal, sumber, jumlah postingan ambigu / Gagal), saringan **IG belum dicek** dan **Ada postingan ambigu**, tombol **Cek IG semua yang belum**, serta saklar **Cek IG otomatis via Apify**. Bila saklar aktif, pendaftar yang mengirim data sosmed langsung dicek diam-diam (tanpa notifikasi ke pendaftar), dan pendaftar yang masih "Belum dicek" otomatis masuk antrean saat daftar dibuka. Yang gagal tidak diulang otomatis supaya kredit tidak terbuang. Di prototipe, cek otomatis berjalan dari browser yang sedang membuka aplikasi; versi produksi menjalankannya di server.
+
 Biaya kira-kira $2,70 per 1.000 postingan di paket Free (cek harga terbaru di apify.com), ditambah biaya Claude. Format data actor bisa berubah; `apify.py` membaca setiap field dengan nilai cadangan.
 
 ## Pantau tanpa login

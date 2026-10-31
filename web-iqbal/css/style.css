@@ -676,3 +676,11 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation-duration: .01ms !important; }
 }
+
+/* Daftar postingan ambigu dan aksi cek IG di daftar pendaftar */
+.daftar-ambigu { padding-left: 1.4em; margin: 6px 0 14px; }
+.daftar-ambigu li { margin-bottom: 12px; }
+.daftar-ambigu li > div { margin: 2px 0; }
+.cek-semua { margin-bottom: 12px; }
+.saklar { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: .92rem; cursor: pointer; padding: 8px 12px; border: 1px solid var(--garis-kuat); border-radius: var(--radius-kecil); background: var(--permukaan); }
+.saklar input { width: 18px; height: 18px; accent-color: var(--emas); }
