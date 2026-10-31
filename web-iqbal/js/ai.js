@@ -4,7 +4,8 @@
 // Dipanggil dengan fetch biasa (bukan SDK) karena prototipe ini sengaja tanpa npm dan tanpa build.
 
 const AI = (() => {
-  const DEFAULT = { apiKey: '', model: 'claude-opus-5-5', webSearch: true, tampilkanRingkasanKePendaftar: true, agenUrl: 'http://localhost:8001' };
+  const DEFAULT = { apiKey: '', model: 'claude-opus-5-5', webSearch: true, tampilkanRingkasanKePendaftar: true, agenUrl: 'http://localhost:8001',
+    apifyToken: '', apifyMaks: 50 };
   const STATUS = ['hijau', 'kuning', 'merah'];
   // Model yang menerima fallback otomatis di server saat klasifikasi keamanan menolak permintaan.
   const MODEL_FALLBACK = ['claude-opus-5-5', 'claude-opus-5', 'claude-fable-5-1', 'claude-sonnet-5-5'];
@@ -286,7 +287,11 @@ Skema JSON:
     const st = await pengaturan();
     const opsi = isi === undefined ? {} : {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(st.apiKey ? { 'X-Api-Key': st.apiKey } : {}) },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(st.apiKey ? { 'X-Api-Key': st.apiKey } : {}),
+        ...(st.apifyToken ? { 'X-Apify-Token': st.apifyToken } : {}),
+      },
       body: JSON.stringify({ ...isi, model: st.model }),
     };
     let res;

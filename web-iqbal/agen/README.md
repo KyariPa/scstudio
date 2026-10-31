@@ -35,6 +35,17 @@ Agen memakai Chrome terpasang, bukan Chromium bawaan Playwright, karena di Windo
 
 API key dan model diambil dari Pengaturan prototipe (dikirim ke agen lewat header `X-Api-Key`). Jika variabel lingkungan `ANTHROPIC_API_KEY` diisi, agen memakai itu saat header kosong.
 
+## Periksa via Apify (tanpa Chrome)
+
+Mode ketiga (`agen/apify.py`): penyedia data [Apify](https://apify.com) mengambil postingan akun public lewat actor `apify/instagram-scraper`, jadi tidak butuh Chrome maupun akun IG panitia. Tombolnya **Periksa IG via Apify** di detail pendaftar.
+
+1. Daftar di console.apify.com (paket Free: kredit $5 per bulan), salin token dari Settings → API & Integrations.
+2. Tempel token di **Pengaturan → Apify**, atur maksimal postingan per akun (bawaan 50, maks. 200), lalu Simpan. Token disimpan di browser dan hanya dikirim ke agen lokal lewat header `X-Apify-Token`.
+3. Agen menjalankan actor secara sinkron (maks. ±5 menit per akun), mengunduh foto sampul + maks. 2 slide carousel per postingan (total maks. 90 foto), lalu Claude menilai foto, caption, dan komentar terbaru (komentar akun pendaftar ditandai PENDAFTAR).
+4. Hasil disimpan sebagai hasil media sosial berlabel "Apify", dan pemantauan tanpa login bisa dipakai sesudahnya.
+
+Biaya kira-kira $2,70 per 1.000 postingan di paket Free (cek harga terbaru di apify.com), ditambah biaya Claude. Format data actor bisa berubah; `apify.py` membaca setiap field dengan nilai cadangan.
+
 ## Pantau tanpa login
 
 Mode kedua (`agen/tanpa_login.py`), tanpa browser dan tanpa akun. Tombolnya **Pantau tanpa login** di detail pendaftar.

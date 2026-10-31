@@ -72,6 +72,7 @@ const LABEL_STATUS = { hijau: 'Hijau · Aman', kuning: 'Kuning · Perlu dicek', 
 const lencana = s => (s ? `<span class="lencana lencana-${esc(s)}">${esc(LABEL_STATUS[s] || s)}</span>` : '<span class="redup">-</span>');
 const labelMode = h => (h?.mode === 'demo' ? '<span class="lencana lencana-demo">DEMO · bukan AI</span>'
   : h?.mode === 'agen' ? `<span class="lencana lencana-prototipe">AI agent IG${h.model ? ` · ${esc(h.model)}` : ''}</span>`
+  : h?.mode === 'apify' ? `<span class="lencana lencana-prototipe">Apify${h.model ? ` · ${esc(h.model)}` : ''}</span>`
   : h?.model ? `<span class="redup kecil">${esc(h.model)}</span>` : '');
 
 function urutanOpsi(id) {
@@ -785,13 +786,13 @@ async function ikutiTugasAgen(jenis, userId, idt) {
     tampil(t.status === 'antre' && t.posisi > 1 ? `Antre, posisi ${t.posisi}. ${t.langkah}` : t.langkah);
   }
   delete tugasAgen[kunci];
-  if (t.status === 'selesai' && jenis === 'periksa') {
+  if (t.status === 'selesai' && (jenis === 'periksa' || jenis === 'periksa-apify')) {
     const a = await ambilApp(userId);
     const h = t.hasil;
-    a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: 'agen', model: h.model, postingan: h.postingan, data: h.data };
+    a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: h.mode, model: h.model, postingan: h.postingan, data: h.data };
     await simpanApp(a);
     await analisisAkhirJikaSiap(userId);
-    toast('AI agent selesai memeriksa Instagram.', 'sukses');
+    toast(jenis === 'periksa' ? 'AI agent selesai memeriksa Instagram.' : 'Pemeriksaan via Apify selesai.', 'sukses');
   } else if (t.status === 'selesai') {
     // Hasil pantau disimpan terpisah supaya tidak menimpa pemeriksaan lengkap agen (yang membaca semua slide).
     const a = await ambilApp(userId);
@@ -888,6 +889,11 @@ async function viewAdminDetail(userId) {
           <button class="tombol" type="button" id="periksaAgen"${tugasAgen[`periksa:${userId}`] ? ' disabled' : ''}>Periksa IG dengan AI agent</button>
           <span class="redup kecil" id="periksaLangkah">${tugasAgen[`periksa:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
         </div>
+        <p class="kecil"><b>Via Apify (tanpa Chrome).</b> Penyedia data Apify mengambil postingan terbaru beserta komentar terbaru, lalu Claude menilai foto, caption, dan komentar. Butuh token Apify di Pengaturan.</p>
+        <div class="baris-tombol">
+          <button class="tombol" type="button" id="apifyAgen"${tugasAgen[`periksa-apify:${userId}`] ? ' disabled' : ''}>Periksa IG via Apify</button>
+          <span class="redup kecil" id="periksa-apifyLangkah">${tugasAgen[`periksa-apify:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
+        </div>
         <p class="kecil"><b>Pantau tanpa login.</b> Tanpa akun dan tanpa browser: mengecek ulang ${postinganDikenal(a).length} postingan yang sudah dikenal lewat halaman publik, mendeteksi postingan terhapus, caption diubah, dan perubahan profil. Claude hanya dipanggil bila ada perubahan.</p>
         <div class="baris-tombol">
           <button class="tombol tombol-tipis" type="button" id="pantauAgen"${tugasAgen[`pantau:${userId}`] ? ' disabled' : ''}>Pantau tanpa login</button>
@@ -943,7 +949,7 @@ async function viewAdminDetail(userId) {
     const b = e.currentTarget;
     b.disabled = true;
     try {
-      const { id } = await AI.agen(`/${jenis}`, isi());
+      const { id } = await AI.agen(`/${jenis}`, await isi());
       tugasAgen[`${jenis}:${userId}`] = id;
       ikutiTugasAgen(jenis, userId, id);
     } catch (err) {
@@ -952,6 +958,9 @@ async function viewAdminDetail(userId) {
     }
   };
   document.getElementById('periksaAgen')?.addEventListener('click', mulaiAgen('periksa', () => ({ username: s.instagram })));
+  document.getElementById('apifyAgen')?.addEventListener('click', mulaiAgen('periksa-apify', async () => ({
+    username: s.instagram, maks: Number((await AI.pengaturan()).apifyMaks) || 50,
+  })));
   document.getElementById('pantauAgen')?.addEventListener('click', mulaiAgen('pantau', () => ({
     username: s.instagram,
     lama: postinganDikenal(a),
@@ -1079,6 +1088,17 @@ async function viewPengaturan() {
         <button class="tombol tombol-tipis" type="button" id="cekAgen">Cek status</button>
       </div>
     </section>
+    <section class="kartu">
+      <h2>Apify (penyedia data, tanpa Chrome)</h2>
+      <p class="redup">Apify mengambil postingan dan komentar terbaru akun public, jadi pemeriksaan tidak butuh Chrome maupun akun IG panitia. Paket Free memberi kredit $5 per bulan; satu postingan kira-kira $0,0027.</p>
+      <form id="fApify">
+        <label>Token API Apify <span class="redup">(console.apify.com → Settings → API & Integrations)</span>
+          <input name="apifyToken" type="password" value="${esc(st.apifyToken)}" placeholder="apify_api_..." autocomplete="off" spellcheck="false"></label>
+        <p class="peringatan kecil">Token disimpan di browser ini saja dan hanya dikirim ke agen lokal, yang meneruskannya ke Apify. Jangan menaruh token di kode atau commit ke GitHub.</p>
+        <label>Maksimal postingan per akun<input name="apifyMaks" type="number" min="1" max="200" value="${esc(st.apifyMaks)}"></label>
+        <button class="tombol">Simpan</button>
+      </form>
+    </section>
     <section class="kartu bahaya">
       <h2>Hapus semua data</h2>
       <p class="redup">Menghapus semua akun, kode, jawaban, screenshot, dan pengaturan di browser ini.</p>
@@ -1091,6 +1111,8 @@ async function viewPengaturan() {
       apiKey: f.get('apiKey').trim(), model: f.get('model').trim(),
       webSearch: f.get('webSearch') === 'on', tampilkanRingkasanKePendaftar: f.get('tampil') === 'on',
       agenUrl: new FormData(document.getElementById('fAgen')).get('agenUrl').trim(),
+      apifyToken: new FormData(document.getElementById('fApify')).get('apifyToken').trim(),
+      apifyMaks: Math.min(Math.max(Number(new FormData(document.getElementById('fApify')).get('apifyMaks')) || 50, 1), 200),
     }, 'settings');
   };
   const cekAgen = async () => {
@@ -1121,6 +1143,7 @@ async function viewPengaturan() {
     }
   });
   form.addEventListener('submit', async e => { e.preventDefault(); await simpan(); toast('Pengaturan disimpan.', 'sukses'); });
+  document.getElementById('fApify').addEventListener('submit', async e => { e.preventDefault(); await simpan(); toast('Pengaturan Apify disimpan.', 'sukses'); });
   document.getElementById('tes').addEventListener('click', async () => {
     await simpan();
     const tutup = sibuk('Menghubungi Claude...');

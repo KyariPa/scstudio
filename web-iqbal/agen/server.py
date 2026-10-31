@@ -28,6 +28,7 @@ from pathlib import Path
 import anthropic
 from playwright.sync_api import sync_playwright
 
+import apify
 import tanpa_login
 
 FOLDER = Path(__file__).resolve().parent
@@ -86,6 +87,22 @@ Setiap temuan WAJIB menyebut sumbernya: URL postingan persis seperti yang diberi
 Skema JSON:
 {{"status":"hijau|kuning|merah","ringkasan":"2-4 kalimat tentang perubahan","cakupan":"apa saja yang dibandingkan","temuan":[{{"kategori":"...","deskripsi":"...","sumber":"URL postingan","tingkat":"rendah|sedang|tinggi"}}],"keterbatasan":"..."}}"""
 
+INSTRUKSI_APIFY = f"""Kamu analis latar belakang untuk seleksi calon anggota Polri. Pendaftar sudah memberi persetujuan tertulis agar jejak digitalnya diperiksa.
+Kamu menerima postingan Instagram terbaru pendaftar dari penyedia data (Apify): foto asli (sampul dan hingga 2 slide carousel), caption, tanggal, jumlah suka, dan sebagian komentar terbaru beserta username pengomentarnya.
+Periksa indikasi: kekerasan atau senjata tajam, minuman keras, narkoba, perjudian (termasuk judi online), ujaran kebencian atau SARA, pornografi, hoaks atau provokasi, perundungan, gaya hidup mewah tidak wajar, balap liar, dan pelanggaran hukum atau etika lainnya.
+Penentuan status:
+- "hijau": tidak ditemukan indikasi negatif pada data yang tersedia.
+- "kuning": indikasi ringan atau ambigu, ATAU data terlalu sedikit untuk menilai.
+- "merah": indikasi kuat pelanggaran hukum atau etika berat, dengan bukti yang jelas.
+Setiap temuan WAJIB menyebut sumbernya: URL postingan persis seperti yang diberikan.
+Komentar dari akun lain bukan perilaku pendaftar; nilai hanya komentar yang ditulis akun pendaftar sendiri (ditandai PENDAFTAR), atau komentar orang lain bila jelas mengungkap perilaku pendaftar (sebutkan bahwa itu klaim orang lain).
+Video hanya terlihat sebagai gambar sampul; sebutkan itu di "keterbatasan" bila ada video.
+{ATURAN}
+Skema JSON:
+{{"status":"hijau|kuning|merah","ringkasan":"2-4 kalimat","cakupan":"apa saja yang berhasil diperiksa","temuan":[{{"kategori":"...","deskripsi":"...","sumber":"URL postingan","tingkat":"rendah|sedang|tinggi"}}],"keterbatasan":"..."}}"""
+
+MAKS_FOTO_APIFY = 90  # batas foto per permintaan Claude
+
 
 class Agen:
     """Semua kerja Playwright terjadi di satu thread ini (API sinkron Playwright tidak aman lintas thread)."""
@@ -106,6 +123,8 @@ class Agen:
         self.kunci = threading.Lock()
         threading.Thread(target=self._jalan, daemon=True).start()
         threading.Thread(target=self._jalan_pantau, daemon=True).start()
+        self.antrean_apify = queue.Queue()   # sumber data Apify: tanpa browser, thread sendiri
+        threading.Thread(target=self._jalan_apify, daemon=True).start()
 
     # ---------- dipanggil dari thread HTTP ----------
 
@@ -127,6 +146,15 @@ class Agen:
             self.urutan.append(idt)
         self.antrean_pantau.put({"jenis": "pantau", "id": idt, "username": username, "model": model, "api_key": api_key,
                                  "lama": lama, "jumlah_lama": jumlah_lama})
+        return idt
+
+    def tambah_apify(self, username, model, api_key, token, maks):
+        idt = uuid.uuid4().hex[:12]
+        with self.kunci:
+            self.tugas[idt] = {"id": idt, "jenis": "apify", "username": username, "status": "antre", "langkah": "Menunggu giliran", "hasil": None, "error": None}
+            self.urutan.append(idt)
+        self.antrean_apify.put({"jenis": "apify", "id": idt, "username": username, "model": model, "api_key": api_key,
+                                "token": token, "maks": maks})
         return idt
 
     def lihat(self, idt):
@@ -310,6 +338,70 @@ class Agen:
             "keterbatasan": str(j.get("keterbatasan", "")),
         }, res.model
 
+    # ---------- sumber data Apify (thread ketiga, tanpa browser) ----------
+
+    def _jalan_apify(self):
+        while True:
+            tugas = self.antrean_apify.get()
+            try:
+                self._apify(tugas)
+            except Exception as e:  # noqa: BLE001 - satu tugas gagal tidak boleh menghentikan pekerja
+                self._ubah(tugas["id"], status="gagal", error=str(e), langkah="Gagal")
+                print(f"[apify] gagal: {e}")
+            finally:
+                with self.kunci:
+                    if tugas["id"] in self.urutan:
+                        self.urutan.remove(tugas["id"])
+
+    def _apify(self, tugas):
+        idt, username = tugas["id"], tugas["username"]
+        with self.kunci:
+            if idt in self.urutan:
+                self.urutan.remove(idt)
+        self._ubah(idt, status="berjalan", langkah=f"Apify mengambil maks. {tugas['maks']} postingan @{username}")
+        postingan = apify.postingan(tugas["token"], username, tugas["maks"])
+        if not postingan:
+            self._ubah(idt, status="selesai", langkah="Selesai", hasil={
+                "mode": "apify", "model": None, "postingan": [],
+                "data": {"status": "kuning", "ringkasan": f"Apify tidak menemukan postingan untuk @{username}.",
+                         "cakupan": "Halaman profil.", "temuan": [],
+                         "keterbatasan": "Akun mungkin private, tidak punya postingan, atau username salah."},
+            })
+            return
+
+        folder = TANGKAPAN / idt
+        folder.mkdir(parents=True, exist_ok=True)
+        isi = [{"type": "text", "text": f"Akun Instagram pendaftar: @{username}\nJumlah postingan yang diambil: {len(postingan)} (terbaru lebih dulu)."}]
+        jumlah_foto = 0
+        for i, p in enumerate(postingan, 1):
+            self._ubah(idt, langkah=f"Mengunduh foto postingan {i} dari {len(postingan)}")
+            komentar = "\n".join(
+                f"  - {'PENDAFTAR' if (k['oleh'] or '').lower() == username.lower() else '@' + str(k['oleh'])}: {k['teks']}"
+                for k in p["komentar"]) or "  (tidak ada)"
+            isi.append({"type": "text", "text": (
+                f"\nPostingan {i}: {p['url']}\nTanggal: {p['tanggal'] or '-'}\nJenis: {p['jenis'] or '-'}\n"
+                f"Suka: {p['suka']}, komentar: {p['jumlahKomentar']}\nLokasi: {p['lokasi'] or '-'}\n"
+                f"Caption: {p['caption'] or '(kosong)'}\nKomentar terbaru:\n{komentar}"
+            )})
+            for k, url_foto in enumerate(p["gambar"], 1):
+                if jumlah_foto >= MAKS_FOTO_APIFY:
+                    break
+                data, jenis = tanpa_login.unduh_foto(url_foto)
+                if not data:
+                    continue
+                (folder / f"{i:02d}-{k}.jpg").write_bytes(data)
+                isi.append({"type": "text", "text": f"Foto postingan {i}, slide {k}:"})
+                isi.append({"type": "image", "source": {"type": "base64", "media_type": jenis,
+                                                        "data": base64.standard_b64encode(data).decode()}})
+                jumlah_foto += 1
+
+        self._ubah(idt, langkah=f"Claude menilai {len(postingan)} postingan ({jumlah_foto} foto)")
+        data, model = self._tanya_claude(tugas, isi, INSTRUKSI_APIFY)
+        self._ubah(idt, status="selesai", langkah="Selesai", hasil={
+            "mode": "apify", "model": model, "data": data, "jumlahFoto": jumlah_foto,
+            "postingan": [{"url": p["url"], "tanggal": p["tanggal"], "caption": p["caption"]} for p in postingan],
+        })
+
     # ---------- pemantauan tanpa login (thread kedua, tanpa browser) ----------
 
     def _jalan_pantau(self):
@@ -426,7 +518,7 @@ def buat_handler(agen):
             if self._asal_sah():
                 self.send_header("Access-Control-Allow-Origin", self.headers["Origin"])
                 self.send_header("Access-Control-Allow-Methods", "GET, POST")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Key")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Api-Key, X-Apify-Token")
             self.end_headers()
 
         def do_GET(self):  # noqa: N802
@@ -450,12 +542,18 @@ def buat_handler(agen):
             if self.path == "/login":
                 agen.minta_login()
                 return self._kirim(200, {"ok": True})
-            if self.path in ("/periksa", "/pantau"):
+            if self.path in ("/periksa", "/pantau", "/periksa-apify"):
                 username = re.sub(r"^@|^https?://(www\.)?instagram\.com/|/.*$", "", str(isi.get("username", "")).strip())
                 if not re.fullmatch(r"[A-Za-z0-9._]{1,30}", username):
                     return self._kirim(400, {"error": "Username Instagram tidak valid."})
                 if self.path == "/periksa":
                     idt = agen.tambah_periksa(username, isi.get("model"), self.headers.get("X-Api-Key"))
+                elif self.path == "/periksa-apify":
+                    token = (self.headers.get("X-Apify-Token") or "").strip()
+                    if not token:
+                        return self._kirim(400, {"error": "Token Apify belum diisi di Pengaturan."})
+                    maks = isi.get("maks") if isinstance(isi.get("maks"), int) else 50
+                    idt = agen.tambah_apify(username, isi.get("model"), self.headers.get("X-Api-Key"), token, max(1, min(maks, 200)))
                 else:
                     lama = [p for p in (isi.get("lama") or []) if isinstance(p, dict)][:50]
                     jumlah = isi.get("jumlahLama") if isinstance(isi.get("jumlahLama"), int) else None
