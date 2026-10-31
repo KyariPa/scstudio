@@ -23,6 +23,7 @@ Opsi:
 | `--maks` | `12` | Maksimal postingan per akun |
 | `--kanal` | `chrome` | Browser: `chrome`, `msedge`, atau `''` untuk Chromium bawaan Playwright |
 | `--tanpa-jendela` | mati | Jalankan browser tanpa jendela (login tetap butuh jendela) |
+| `--jeda-pantau` | `60` | Jeda antar-akun untuk pemantauan tanpa login (detik) |
 
 Agen memakai Chrome terpasang, bukan Chromium bawaan Playwright, karena di Windows aplikasi berpaket (misalnya Claude desktop) Chromium unduhan Playwright tersimpan di folder virtual dan diblokir Windows.
 
@@ -33,6 +34,17 @@ Agen memakai Chrome terpasang, bukan Chromium bawaan Playwright, karena di Windo
 3. Hasil tersimpan sebagai hasil media sosial berlabel "AI agent IG", lengkap dengan daftar postingan yang dibaca, lalu rangkuman akhir dibuat ulang.
 
 API key dan model diambil dari Pengaturan prototipe (dikirim ke agen lewat header `X-Api-Key`). Jika variabel lingkungan `ANTHROPIC_API_KEY` diisi, agen memakai itu saat header kosong.
+
+## Pantau tanpa login
+
+Mode kedua (`agen/tanpa_login.py`), tanpa browser dan tanpa akun. Tombolnya **Pantau tanpa login** di detail pendaftar.
+
+1. Panel mengirim daftar postingan yang sudah dikenal (dari pemeriksaan agen dan pemantauan sebelumnya) plus jumlah postingan terakhir.
+2. Agen membuka halaman profil publik (nama, pengikut, mengikuti, jumlah postingan) lalu halaman publik tiap postingan (caption, tanggal, suka, komentar, foto sampul dari `scontent.cdninstagram.com`; foto langsung disimpan karena link CDN kedaluwarsa dalam beberapa hari).
+3. Postingan yang tidak lagi ada dicatat sebagai **terhapus** (isinya tetap dari snapshot), caption yang berbeda sebagai **diubah**, postingan baru sebagai **baru**.
+4. Claude hanya dipanggil bila ada perubahan; hasilnya disimpan terpisah (`aiPantau`) dan tidak menimpa pemeriksaan lengkap agen.
+
+Permintaan dikirim apa adanya (user agent `SeleksiBhayangkara-Agen/0.1`, tanpa proxy, tanpa menyamar sebagai browser) dan pelan (1,5-3 detik antar-halaman). Batasannya: tanpa login, halaman profil tidak memuat daftar postingan, jadi postingan baru baru terlihat dari naiknya jumlah postingan; isinya perlu dibaca dengan pemeriksaan agen. Hanya foto sampul (slide pertama, dipotong persegi) yang tersedia, tanpa komentar. Dari IP server cloud, Instagram lebih cepat membatasi permintaan seperti ini.
 
 ## Batasan
 

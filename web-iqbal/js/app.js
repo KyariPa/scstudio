@@ -731,11 +731,47 @@ function blokGagal(h, jenis) {
   return '';
 }
 
-// Tugas agen IG yang sedang berjalan per pendaftar (userId -> id tugas). Pemantauan tetap jalan walau admin pindah halaman.
+// Tugas agen IG yang sedang berjalan ("periksa:<userId>" / "pantau:<userId>" -> id tugas).
+// Pengikutan tugas tetap jalan walau admin pindah halaman.
 const tugasAgen = {};
 
-async function pantauAgen(userId, idt) {
-  const tampil = teks => { const el = document.getElementById('agenLangkah'); if (el && location.hash.endsWith(userId)) el.textContent = teks; };
+const tabelTemuan = temuan => (temuan.length ? `<div class="tabel-bungkus tabel-kartu temuan"><table><thead><tr><th>Kategori</th><th>Temuan</th><th>Sumber</th><th>Tingkat</th></tr></thead><tbody>
+  ${temuan.map(t => `<tr><td data-label="Kategori"><b>${esc(t.kategori)}</b></td><td data-label="Temuan">${esc(t.deskripsi)}</td><td data-label="Sumber" class="pecah">${/^https?:\/\//.test(t.sumber) ? `<a href="${esc(t.sumber)}" target="_blank" rel="noopener noreferrer">${esc(t.sumber)}</a>` : esc(t.sumber)}</td><td data-label="Tingkat"><span class="tingkat tingkat-${esc(t.tingkat)}">${esc(t.tingkat)}</span></td></tr>`).join('')}
+  </tbody></table></div>` : '<p>Tidak ada temuan.</p>');
+
+const tglPendek = s => { const d = new Date(s); return Number.isNaN(d.getTime()) ? String(s || '-') : d.toLocaleDateString('id-ID', { dateStyle: 'medium' }); };
+const linkIG = url => (/^https:\/\/www\.instagram\.com\//.test(url) ? esc(url) : '#');
+
+// Hasil pemantauan tanpa login: profil sekarang, postingan terhapus (isi tetap dari snapshot), caption diubah, postingan baru.
+function blokPantau(p) {
+  if (!p) return '';
+  const angka = v => (v ?? '-').toLocaleString('id-ID');
+  const daftar = (judul, isi, kelas = '') => (isi.length ? `<div class="${kelas}"><b>${judul}</b><ul>${isi.join('')}</ul></div>` : '');
+  return `
+    <div class="kotak-pantau">
+      <div class="judul-baris"><h3>Pemantauan tanpa login</h3>${p.data ? lencana(p.data.status) : '<span class="chip chip-setuju">Tidak ada perubahan</span>'}</div>
+      <p class="redup kecil">Terakhir ${tgl(p.waktu)}${p.model ? ` · ${esc(p.model)}` : ''}</p>
+      <p class="kecil">Profil sekarang: <b>${angka(p.profil?.pengikut)}</b> pengikut · <b>${angka(p.profil?.mengikuti)}</b> mengikuti · <b>${angka(p.profil?.jumlahPostingan)}</b> postingan${p.jumlahLama != null && p.jumlahLama !== p.profil?.jumlahPostingan ? ` <span class="chip chip-tunggu">sebelumnya ${angka(p.jumlahLama)}</span>` : ''}</p>
+      ${daftar(`${p.dihapus.length} postingan terhapus (isi dari snapshot sebelumnya)`, p.dihapus.map(d => `<li>${esc(tglPendek(d.tanggal))}: ${esc(d.caption || '(tanpa caption)')} <span class="redup kecil pecah">${esc(d.url)}</span></li>`), 'galat')}
+      ${daftar('Caption diubah', p.berubah.map(d => `<li><a href="${linkIG(d.url)}" target="_blank" rel="noopener noreferrer">postingan</a>: "${esc(d.captionLama || '')}" → "${esc(d.caption || '')}"</li>`), 'peringatan')}
+      ${daftar('Postingan baru', p.baru.map(d => `<li><a href="${linkIG(d.url)}" target="_blank" rel="noopener noreferrer">${esc(tglPendek(d.tanggal))}</a>: ${esc(d.caption || '(tanpa caption)')}</li>`))}
+      ${p.data ? `<p>${esc(p.data.ringkasan)}</p>${tabelTemuan(p.data.temuan)}<p class="redup kecil"><b>Keterbatasan:</b> ${esc(p.data.keterbatasan)}</p>` : ''}
+    </div>`;
+}
+
+// Daftar postingan yang sudah dikenal untuk pemantauan: hasil agen + hasil pantau terakhir, tanpa yang sudah terhapus.
+function postinganDikenal(a) {
+  const terhapus = new Set((a.aiPantau?.dihapus || []).map(p => p.url));
+  const peta = new Map();
+  for (const p of [...(a.aiSosmed?.postingan || []), ...(a.aiPantau?.dikenal || [])]) {
+    if (p?.url && !terhapus.has(p.url)) peta.set(p.url, { url: p.url, caption: p.caption || '', tanggal: p.tanggal || null });
+  }
+  return [...peta.values()];
+}
+
+async function ikutiTugasAgen(jenis, userId, idt) {
+  const kunci = `${jenis}:${userId}`;
+  const tampil = teks => { const el = document.getElementById(`${jenis}Langkah`); if (el && location.hash.endsWith(userId)) el.textContent = teks; };
   let t;
   for (;;) {
     await new Promise(r => setTimeout(r, 3000));
@@ -748,14 +784,27 @@ async function pantauAgen(userId, idt) {
     if (t.status === 'selesai' || t.status === 'gagal') break;
     tampil(t.status === 'antre' && t.posisi > 1 ? `Antre, posisi ${t.posisi}. ${t.langkah}` : t.langkah);
   }
-  delete tugasAgen[userId];
-  if (t.status === 'selesai') {
+  delete tugasAgen[kunci];
+  if (t.status === 'selesai' && jenis === 'periksa') {
     const a = await ambilApp(userId);
     const h = t.hasil;
     a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: 'agen', model: h.model, postingan: h.postingan, data: h.data };
     await simpanApp(a);
     await analisisAkhirJikaSiap(userId);
     toast('AI agent selesai memeriksa Instagram.', 'sukses');
+  } else if (t.status === 'selesai') {
+    // Hasil pantau disimpan terpisah supaya tidak menimpa pemeriksaan lengkap agen (yang membaca semua slide).
+    const a = await ambilApp(userId);
+    const h = t.hasil;
+    const dihapus = new Map((a.aiPantau?.dihapus || []).map(p => [p.url, p]));
+    for (const p of h.dihapus) dihapus.set(p.url, { ...p, terdeteksi: sekarang() });
+    a.aiPantau = {
+      waktu: sekarang(), model: h.model, profil: h.profil, jumlahLama: h.jumlahLama,
+      dihapus: [...dihapus.values()], berubah: h.berubah, baru: h.baru, data: h.data, dikenal: [...h.dikenal],
+    };
+    await simpanApp(a);
+    const ada = h.dihapus.length + h.berubah.length + h.baru.length;
+    toast(ada ? `Pemantauan selesai: ${ada} perubahan.` : 'Pemantauan selesai: tidak ada perubahan.', 'sukses');
   } else {
     toast(`AI agent gagal: ${t.error || 'tidak diketahui'}`, 'gagal');
   }
@@ -826,9 +875,7 @@ async function viewAdminDetail(userId) {
       ${blokGagal(so) || `
         <p>${esc(so.data.ringkasan)}</p>
         <p><b>Yang diperiksa:</b> ${esc(so.data.cakupan)}</p>
-        ${so.data.temuan.length ? `<div class="tabel-bungkus tabel-kartu temuan"><table><thead><tr><th>Kategori</th><th>Temuan</th><th>Sumber</th><th>Tingkat</th></tr></thead><tbody>
-          ${so.data.temuan.map(t => `<tr><td data-label="Kategori"><b>${esc(t.kategori)}</b></td><td data-label="Temuan">${esc(t.deskripsi)}</td><td data-label="Sumber" class="pecah">${/^https?:\/\//.test(t.sumber) ? `<a href="${esc(t.sumber)}" target="_blank" rel="noopener noreferrer">${esc(t.sumber)}</a>` : esc(t.sumber)}</td><td data-label="Tingkat"><span class="tingkat tingkat-${esc(t.tingkat)}">${esc(t.tingkat)}</span></td></tr>`).join('')}
-        </tbody></table></div>` : '<p>Tidak ada temuan.</p>'}
+        ${tabelTemuan(so.data.temuan)}
         <p><b>Keterbatasan:</b> ${esc(so.data.keterbatasan)}</p>
         ${so.postingan?.length ? `<details><summary>Postingan yang dibaca agen (${so.postingan.length})</summary><ul>${so.postingan.map(p => `<li class="pecah"><a href="${/^https:\/\/www\.instagram\.com\//.test(p.url) ? esc(p.url) : '#'}" target="_blank" rel="noopener noreferrer">${p.tanggal ? tgl(p.tanggal) : 'Postingan'}</a>${p.caption ? `: ${esc(p.caption)}` : ''}</li>`).join('')}</ul></details>` : ''}
         ${so.sumber?.length ? `<details><summary>Sumber web yang ditelusuri AI (${so.sumber.length})</summary><ul>${so.sumber.map(x => `<li class="pecah">${/^https?:\/\//.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.judul)}</a>` : esc(x.judul)}</li>`).join('')}</ul></details>` : ''}`}
@@ -838,10 +885,16 @@ async function viewAdminDetail(userId) {
       <div class="kotak-agen">
         <p><b>AI agent Instagram (demo).</b> Agen membuka akun ${esc(s.instagram)} memakai akun IG panitia, membaca postingan terbaru, lalu Claude menilainya.</p>
         <div class="baris-tombol">
-          <button class="tombol" type="button" id="periksaAgen"${tugasAgen[userId] ? ' disabled' : ''}>Periksa IG dengan AI agent</button>
-          <span class="redup kecil" id="agenLangkah">${tugasAgen[userId] ? 'Sedang diperiksa...' : ''}</span>
+          <button class="tombol" type="button" id="periksaAgen"${tugasAgen[`periksa:${userId}`] ? ' disabled' : ''}>Periksa IG dengan AI agent</button>
+          <span class="redup kecil" id="periksaLangkah">${tugasAgen[`periksa:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
         </div>
-      </div>` : ''}`);
+        <p class="kecil"><b>Pantau tanpa login.</b> Tanpa akun dan tanpa browser: mengecek ulang ${postinganDikenal(a).length} postingan yang sudah dikenal lewat halaman publik, mendeteksi postingan terhapus, caption diubah, dan perubahan profil. Claude hanya dipanggil bila ada perubahan.</p>
+        <div class="baris-tombol">
+          <button class="tombol tombol-tipis" type="button" id="pantauAgen"${tugasAgen[`pantau:${userId}`] ? ' disabled' : ''}>Pantau tanpa login</button>
+          <span class="redup kecil" id="pantauLangkah">${tugasAgen[`pantau:${userId}`] ? 'Sedang dipantau...' : ''}</span>
+        </div>
+      </div>` : ''}
+      ${blokPantau(a.aiPantau)}`);
 
   const kp = a.keputusan;
   const chipKeputusan = kp ? `<span class="chip ${kp.status === 'disetujui' ? 'chip-setuju' : 'chip-tolak'}">${kp.status === 'disetujui' ? 'Disetujui' : 'Ditolak'}</span>` : tahap(a) === 'selesai' ? '<span class="chip chip-tunggu">Menunggu keputusan</span>' : '<span class="chip">Belum bisa diputuskan</span>';
@@ -886,18 +939,24 @@ async function viewAdminDetail(userId) {
     else panelTerbuka.delete(d.dataset.panel);
   }));
 
-  document.getElementById('periksaAgen')?.addEventListener('click', async e => {
+  const mulaiAgen = (jenis, isi) => async e => {
     const b = e.currentTarget;
     b.disabled = true;
     try {
-      const { id } = await AI.agen('/periksa', { username: s.instagram });
-      tugasAgen[userId] = id;
-      pantauAgen(userId, id);
+      const { id } = await AI.agen(`/${jenis}`, isi());
+      tugasAgen[`${jenis}:${userId}`] = id;
+      ikutiTugasAgen(jenis, userId, id);
     } catch (err) {
       toast(err.message, 'gagal');
       b.disabled = false;
     }
-  });
+  };
+  document.getElementById('periksaAgen')?.addEventListener('click', mulaiAgen('periksa', () => ({ username: s.instagram })));
+  document.getElementById('pantauAgen')?.addEventListener('click', mulaiAgen('pantau', () => ({
+    username: s.instagram,
+    lama: postinganDikenal(a),
+    jumlahLama: a.aiPantau?.profil?.jumlahPostingan ?? a.aiSosmed?.postingan?.length ?? null,
+  })));
 
   app.querySelectorAll('[data-ulang]').forEach(b => b.addEventListener('click', async () => {
     const jenis = b.dataset.ulang;

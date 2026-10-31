@@ -553,6 +553,11 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
 
 .kotak-agen { margin-top: 16px; padding: 14px 16px; border: 1px dashed var(--emas); border-radius: var(--radius-kecil); background: var(--emas-lembut); }
 .kotak-agen p { margin-bottom: 10px; }
+.kotak-agen .baris-tombol + p { margin-top: 14px; }
+.kotak-pantau { margin-top: 16px; padding: 14px 16px; border: 1px solid var(--garis); border-radius: var(--radius-kecil); background: var(--permukaan-2); }
+.kotak-pantau h3 { margin: 0; }
+.kotak-pantau .galat, .kotak-pantau .peringatan { margin: 10px 0; }
+.kotak-pantau ul { margin: 6px 0 0; }
 .peringatan { background: var(--kuning-latar); color: var(--kuning); border: 1px solid var(--kuning-garis); padding: 10px 12px; border-radius: var(--radius-kecil); }
 .galat { background: var(--merah-latar); color: var(--merah); border: 1px solid var(--merah-garis); padding: 10px 12px; border-radius: var(--radius-kecil); }
 
