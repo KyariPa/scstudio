@@ -955,7 +955,8 @@ async function viewAdminDetail(userId) {
   document.getElementById('pantauAgen')?.addEventListener('click', mulaiAgen('pantau', () => ({
     username: s.instagram,
     lama: postinganDikenal(a),
-    jumlahLama: a.aiPantau?.profil?.jumlahPostingan ?? a.aiSosmed?.postingan?.length ?? null,
+    // Jumlah postingan akun dari pemantauan sebelumnya; pemeriksaan agen hanya membaca sebagian postingan, jadi bukan acuan.
+    jumlahLama: a.aiPantau?.profil?.jumlahPostingan ?? null,
   })));
 
   app.querySelectorAll('[data-ulang]').forEach(b => b.addEventListener('click', async () => {
