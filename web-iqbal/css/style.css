@@ -684,3 +684,37 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
 .cek-semua { margin-bottom: 12px; }
 .saklar { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: .92rem; cursor: pointer; padding: 8px 12px; border: 1px solid var(--garis-kuat); border-radius: var(--radius-kecil); background: var(--permukaan); }
 .saklar input { width: 18px; height: 18px; accent-color: var(--emas); }
+
+/* Demo prototipe: isi otomatis psikotes */
+.demo-isi { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 16px; padding: 10px 14px; border: 1px dashed var(--garis-kuat); border-radius: var(--radius-kecil); }
+.demo-isi .label-atas { margin: 0; }
+.demo-isi .tombol::before { content: ""; width: 10px; height: 10px; border-radius: 50%; }
+.demo-hijau::before { background: var(--hijau); }
+.demo-kuning::before { background: var(--kuning); }
+.demo-merah::before { background: var(--merah); }
+
+/* Layar pemindaian IG (demo) */
+.tombol-scan { padding: 3px 10px; font-size: .78rem; margin-left: 6px; vertical-align: 1px; }
+.pindai { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(12, 9, 5, .72); backdrop-filter: blur(3px); }
+.pindai-kotak { position: relative; width: min(640px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: var(--permukaan); color: var(--tinta); border: 1px solid var(--garis); border-radius: var(--radius); padding: 22px; box-shadow: var(--bayang-kuat); animation: muncul-pindai .25s ease-out; }
+@keyframes muncul-pindai { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.pindai-tutup { position: absolute; top: 10px; right: 12px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: var(--latar-2); color: var(--tinta); font-size: 1.3rem; cursor: pointer; }
+.pindai-kepala { display: flex; gap: 16px; align-items: center; margin-bottom: 18px; }
+.pindai-kepala h2 { margin: 0; }
+.pindai-kepala p { margin: 2px 0 0; }
+.radar { position: relative; flex: none; width: 72px; height: 72px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle, var(--emas-lembut) 0 55%, transparent 56%); border: 2px solid var(--emas); overflow: hidden; }
+.radar b { position: relative; z-index: 1; font-size: 1.5rem; color: var(--emas-tinta); }
+.radar span { position: absolute; inset: 0; background: conic-gradient(from 0deg, color-mix(in srgb, var(--emas) 55%, transparent), transparent 35%); animation: putar 1.6s linear infinite; }
+.pindai-langkah { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 8px; }
+.pindai-langkah li { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-kecil); background: var(--permukaan-2); color: var(--redup); font-weight: 600; transition: background .2s, color .2s; }
+.pindai-langkah li::before { content: ""; flex: none; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--garis-kuat); }
+.pindai-langkah li.aktif { color: var(--tinta); background: var(--emas-lembut); }
+.pindai-langkah li.aktif::before { border-color: var(--emas); border-top-color: transparent; animation: putar .8s linear infinite; }
+.pindai-langkah li.selesai { color: var(--hijau); }
+.pindai-langkah li.selesai::before { content: "✓"; display: grid; place-items: center; font-size: .7rem; background: var(--hijau); border-color: var(--hijau); color: #fff; }
+.pindai-hasil { border-left: 5px solid var(--garis-kuat); padding-left: 14px; }
+.pindai-hasil.hasil-hijau { border-left-color: var(--hijau); }
+.pindai-hasil.hasil-kuning { border-left-color: var(--kuning); }
+.pindai-hasil.hasil-merah { border-left-color: var(--merah); }
+.pindai-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.pindai-status .lencana { font-size: 1rem; padding: 6px 14px; }

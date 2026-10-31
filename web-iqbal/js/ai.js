@@ -239,6 +239,7 @@ Skema JSON:
     const { json } = await panggil(st, {
       instructions: `Kamu menyusun rangkuman akhir untuk admin seleksi calon anggota Polri dengan menggabungkan hasil psikotes dan pemeriksaan media sosial.
 Status akhir: "hijau" = layak dilanjutkan, "kuning" = perlu klarifikasi atau wawancara mendalam, "merah" = tidak disarankan lolos. Status akhir tidak boleh lebih baik dari status media sosial jika status media sosial "merah" dengan bukti kuat.
+Pedoman skor psikotes: di bawah 40% dengan pilihan yang konsisten bertentangan dengan karakter Bhayangkara (mis. melanggar aturan, mementingkan diri, tidak jujur) = "merah"; 80% atau lebih dengan alasan yang wajar dan media sosial "hijau" = "hijau"; selebihnya nilai sesuai bukti.
 ${ATURAN}
 Skema JSON:
 {"status":"hijau|kuning|merah","ringkasan":"3-5 kalimat","alasan":["..."],"rekomendasi_admin":"1-3 kalimat","pertanyaan_wawancara":["3-5 pertanyaan klarifikasi"]}`,

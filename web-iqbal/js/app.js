@@ -418,6 +418,52 @@ async function viewPersetujuan() {
   });
 }
 
+// ---------- Isi otomatis psikotes (khusus demo prototipe) ----------
+
+// Alasan per karakter supaya isian demo tidak terbaca sebagai alasan templat yang diulang-ulang.
+const ALASAN_KARAKTER = {
+  BRA: 'ibadah dan tugas sama-sama amanah, jadi harus diatur supaya keduanya terjaga',
+  TA: 'kepentingan bangsa dan masyarakat harus didahulukan di atas kepentingan pribadi',
+  DE: 'setiap aspirasi warga perlu didengar dan diselesaikan lewat cara yang sah',
+  DI: 'aturan dibuat untuk dipatuhi, dan pelanggaran kecil bisa jadi kebiasaan buruk',
+  KA: 'pekerjaan harus selesai dengan baik, tetapi tetap dengan cara yang cerdas dan aman',
+  SI: 'saya harus bertanggung jawab atas mutu pekerjaan dan terus belajar bila belum mampu',
+  S: 'hidup sederhana menjaga saya dari godaan dan membuat saya dekat dengan masyarakat',
+  E: 'orang yang sedang kesulitan perlu dibantu dengan tulus, bukan hanya dilayani sesuai prosedur',
+  J: 'kejujuran adalah dasar kepercayaan masyarakat, walaupun akibatnya tidak enak bagi saya',
+  A: 'semua orang harus diperlakukan sama tanpa melihat status, kedekatan, atau latar belakang',
+  T: 'perilaku saya akan dicontoh orang lain, jadi saya harus memberi contoh yang benar',
+  I: 'saya harus konsisten antara ucapan dan tindakan, termasuk saat tidak ada yang melihat',
+};
+const ALASAN_KUNING = [
+  'Pilihan ini cukup masuk akal di lapangan, walaupun mungkin belum yang paling ideal.',
+  'Saya pilih ini supaya urusannya cepat selesai dan tidak memperpanjang masalah.',
+  'Menurut saya ini jalan tengah yang aman, meski ada cara lain yang lebih baik.',
+  'Biasanya di lapangan memang begini, jadi saya ikut kebiasaan yang ada saja.',
+  'Saya belum yakin, tapi pilihan ini yang paling praktis untuk saya saat itu.',
+];
+const ALASAN_MERAH = [
+  'Lebih praktis begini, aturan bisa dilonggarkan kalau tidak ada yang tahu.',
+  'Yang penting saya aman dulu, urusan orang lain belakangan saja.',
+  'Semua orang juga begitu, jadi saya tidak merasa ada yang salah dengan pilihan ini.',
+  'Kalau ada kesempatan ya dimanfaatkan saja, tidak perlu terlalu kaku.',
+  'Saya pilih yang paling menguntungkan buat saya, itu wajar menurut saya.',
+];
+
+function jawabanDemo(skenario) {
+  const jawaban = {};
+  SOAL.forEach((s, i) => {
+    const nilai = skenario === 'hijau' ? 4 : skenario === 'kuning' ? (i % 3 === 0 ? 2 : 3) : (i % 4 === 0 ? 2 : 1);
+    const choice = s.o.findIndex(o => o[1] === nilai);
+    const opsi = s.o[choice][0].replace(/\.$/, '').toLowerCase();
+    const reason = skenario === 'hijau'
+      ? `Saya memilih ${opsi}, karena ${ALASAN_KARAKTER[s.d]}.`
+      : (skenario === 'kuning' ? ALASAN_KUNING : ALASAN_MERAH)[i % 5];
+    jawaban[s.id] = { choice, reason };
+  });
+  return jawaban;
+}
+
 async function viewPsikotes(halamanStr) {
   const a = await ambilApp(saya.id);
   if (!a.persetujuan) return pergi('/persetujuan');
@@ -452,6 +498,13 @@ async function viewPsikotes(halamanStr) {
       <div class="psikotes-info"><span>Bagian <b>${hal + 1}</b> dari ${DIMENSI.length} · ${esc(d.nama)}</span><span class="redup"><span id="hitung"></span><span class="sembunyi-hp"> · tersimpan otomatis</span></span></div>
       <div class="kemajuan" role="progressbar" aria-label="Soal lengkap" aria-valuemin="0" aria-valuemax="${SOAL.length}" id="kemajuan"><div id="bar"></div></div>
       <nav class="bagian-nav" id="bagianNav" aria-label="Bagian psikotes"></nav>
+    </div>
+    <div class="demo-isi">
+      <span class="label-atas">Demo prototipe</span>
+      <span class="kecil">Isi otomatis 60 soal:</span>
+      <button type="button" class="tombol tombol-tipis demo-hijau" data-demo="hijau">Hijau</button>
+      <button type="button" class="tombol tombol-tipis demo-kuning" data-demo="kuning">Kuning</button>
+      <button type="button" class="tombol tombol-tipis demo-merah" data-demo="merah">Merah</button>
     </div>
     <section class="kartu bagian-kepala">
       <span class="kode-dimensi">${esc(d.kode)}</span>
@@ -492,6 +545,13 @@ async function viewPsikotes(halamanStr) {
     document.getElementById('bagianNav').innerHTML = chipBagian();
   };
   perbaruiKemajuan();
+
+  app.querySelectorAll('[data-demo]').forEach(b => b.addEventListener('click', async () => {
+    a.psikotes.answers = jawabanDemo(b.dataset.demo);
+    await simpanApp(a);
+    toast(`60 soal terisi (skenario ${b.textContent}). Periksa, lalu kirim di bagian terakhir.`, 'sukses');
+    if (terakhir) viewPsikotes(String(hal)); else pergi(`/psikotes/${DIMENSI.length - 1}`);
+  }));
 
   let tunda;
   const form = document.getElementById('f');
@@ -676,7 +736,8 @@ function statusCekIG(userId, a) {
   if (so?.status === 'ok' && (so.mode === 'apify' || so.mode === 'agen')) {
     const n = so.data.temuan.length;
     return {
-      kode: 'sudah', ambigu: n, kelas: n ? 'chip-tunggu' : 'chip-setuju',
+      kode: 'sudah', ambigu: n, status: so.data.status,
+      kelas: { hijau: 'chip-setuju', kuning: 'chip-tunggu', merah: 'chip-tolak' }[so.data.status] || '',
       teks: `Sudah dicek · ${tglPendek(so.waktu)} · ${so.mode === 'apify' ? 'Apify' : 'Agen'} · ${n ? `${n} ambigu` : 'tanpa temuan'}`,
     };
   }
@@ -711,7 +772,7 @@ async function viewAdmin() {
       <td data-label="Tahap"><span class="chip ${kelasTahap(a)}">${esc(teksTahap(a))}</span></td>
       <td data-label="Psikotes">${a?.psikotes?.dikirim ? `<b>${a.psikotes.total}%</b>` : '<span class="redup">-</span>'}</td>
       <td data-label="Sosmed">${lencana(a?.aiSosmed?.data?.status)}</td>
-      <td data-label="Cek IG"><span class="chip ${s.kelas}">${esc(s.teks)}</span></td>
+      <td data-label="Cek IG"><span class="chip ${s.kelas}">${esc(s.teks)}</span>${['tanpa', 'jalan'].includes(s.kode) ? '' : ` <button type="button" class="tombol tombol-tipis tombol-scan" data-scan="${u.id}">Scan</button>`}</td>
       <td data-label="Akhir">${lencana(a?.aiAkhir?.data?.status)}</td>
     </tr>`;
   }).join('');
@@ -775,12 +836,113 @@ async function viewAdmin() {
     if (jalan) toast(`${jalan} akun IG masuk antrean Apify.`, 'sukses');
     viewAdmin();
   });
+  app.querySelectorAll('[data-scan]').forEach(b => b.addEventListener('click', () => bukaPindai(b.dataset.scan)));
   document.getElementById('otoIG').addEventListener('change', async e => {
     const nyala = e.target.checked;
     await DB.put('kv', { ...(await AI.pengaturan()), apifyOtomatis: nyala }, 'settings');
     toast(nyala ? 'Cek IG otomatis aktif.' : 'Cek IG otomatis nonaktif.', 'sukses');
     viewAdmin();
   });
+}
+
+// Layar pemindaian satu pendaftar (gimmick demo): radar + langkah yang menyala sesuai progres agen,
+// lalu berganti menjadi rangkuman lengkap. Hanya akun ini yang dicek, walau cek otomatis sedang nonaktif.
+const LANGKAH_PINDAI = ['Mengambil postingan', 'Membaca foto & komentar', 'AI menilai konten', 'Menyusun rangkuman'];
+
+async function bukaPindai(userId) {
+  const u = await DB.get('users', userId);
+  const a = await ambilApp(userId);
+  const username = a.sosmed?.instagram || '';
+  document.querySelector('.pindai')?.remove();
+  const layar = document.createElement('div');
+  layar.className = 'pindai';
+  layar.setAttribute('role', 'dialog');
+  layar.setAttribute('aria-modal', 'true');
+  layar.setAttribute('aria-label', 'Pemindaian Instagram');
+  layar.innerHTML = `
+    <div class="pindai-kotak">
+      <button type="button" class="pindai-tutup" aria-label="Tutup">×</button>
+      <div class="pindai-kepala">
+        <div class="radar" aria-hidden="true"><span></span><b>${esc((u.nama || '?').trim()[0] || '?')}</b></div>
+        <div><span class="label-atas">Memindai Instagram</span><h2>${esc(username)}</h2><p class="redup kecil">${esc(u.nama)}</p></div>
+      </div>
+      <div id="pindaiIsi">
+        <ol class="pindai-langkah">${LANGKAH_PINDAI.map((l, i) => `<li data-l="${i}">${l}</li>`).join('')}</ol>
+        <div class="kemajuan"><div id="pindaiBar"></div></div>
+        <p class="redup kecil" id="pindaiTeks">Menyiapkan pemindaian…</p>
+      </div>
+    </div>`;
+  document.body.appendChild(layar);
+  const tutup = () => { layar.remove(); document.removeEventListener('keydown', esc_); };
+  const esc_ = e => { if (e.key === 'Escape') tutup(); };
+  document.addEventListener('keydown', esc_);
+  layar.querySelector('.pindai-tutup').addEventListener('click', tutup);
+  layar.addEventListener('click', e => { if (e.target === layar) tutup(); });
+
+  const tandai = (langkah, persen, teks) => {
+    layar.querySelectorAll('.pindai-langkah li').forEach((li, i) => {
+      li.classList.toggle('selesai', i < langkah);
+      li.classList.toggle('aktif', i === langkah);
+    });
+    const bar = layar.querySelector('#pindaiBar');
+    if (bar) bar.style.width = `${persen}%`;
+    const p = layar.querySelector('#pindaiTeks');
+    if (p && teks) p.textContent = teks;
+  };
+  const galat = pesan => {
+    const isi = layar.querySelector('#pindaiIsi');
+    if (isi) isi.innerHTML = `<p class="galat">${esc(pesan)}</p>`;
+  };
+
+  let idt = tugasAgen[`periksa-apify:${userId}`];
+  if (!idt) {
+    try {
+      const maks = Number((await AI.pengaturan()).apifyMaks) || 50;
+      ({ id: idt } = await AI.agen('/periksa-apify', { username, maks }));
+      tugasAgen[`periksa-apify:${userId}`] = idt;
+      ikutiTugasAgen('periksa-apify', userId, idt, true);
+    } catch (err) {
+      return galat(err.message);
+    }
+  }
+
+  for (;;) {
+    await new Promise(r => setTimeout(r, 1200));
+    if (!document.body.contains(layar)) return; // ditutup admin; tugas tetap jalan di latar
+    let t;
+    try { t = await AI.agen(`/tugas/${idt}`); } catch { continue; }
+    if (t.status === 'gagal') return galat(`Pemindaian gagal: ${t.error || 'tidak diketahui'}`);
+    if (t.status === 'selesai') break;
+    const l = t.langkah || '';
+    const m = l.match(/(\d+) dari (\d+)/);
+    if (/Apify mengambil/.test(l)) tandai(0, 15, l);
+    else if (/Mengunduh foto/.test(l)) tandai(1, 25 + (m ? 40 * (m[1] / m[2]) : 0), l);
+    else if (/Claude menilai/.test(l)) tandai(2, 75, l);
+    else tandai(0, 5, l);
+  }
+  // Tunggu hasil tersimpan dan rangkuman akhir diperbarui (dikerjakan ikutiTugasAgen).
+  tandai(3, 92, 'Menyusun rangkuman…');
+  for (let i = 0; i < 90 && tugasAgen[`periksa-apify:${userId}`]; i++) await new Promise(r => setTimeout(r, 1000));
+  if (!document.body.contains(layar)) return;
+  tandai(4, 100, 'Selesai');
+
+  const b = await ambilApp(userId);
+  const so = b.aiSosmed;
+  const ak = b.aiAkhir;
+  const isi = layar.querySelector('#pindaiIsi');
+  isi.innerHTML = `
+    <div class="pindai-hasil hasil-${esc(so?.data?.status || 'kuning')}">
+      <div class="pindai-status">${lencana(so?.data?.status)} <span class="redup kecil">${so?.postingan?.length || 0} postingan · ${labelMode(so)}</span></div>
+      <p>${esc(so?.data?.ringkasan || '')}</p>
+      ${daftarTemuan(so?.data?.temuan || [])}
+      ${ak?.status === 'ok' ? `<div class="kotak-info"><p><b>Rangkuman akhir:</b> ${lencana(ak.data.status)}<br>${esc(ak.data.ringkasan)}</p></div>` : ''}
+      <div class="baris-tombol">
+        <a class="tombol" href="#/admin/p/${userId}">Buka detail pendaftar</a>
+        <button type="button" class="tombol tombol-tipis" id="pindaiSelesai">Tutup</button>
+      </div>
+    </div>`;
+  isi.querySelector('a').addEventListener('click', tutup);
+  isi.querySelector('#pindaiSelesai').addEventListener('click', tutup);
 }
 
 // Masukkan akun IG ke antrean Apify. diam = true: tanpa notifikasi (dipakai di sisi pendaftar,
@@ -867,7 +1029,6 @@ async function ikutiTugasAgen(jenis, userId, idt, diam = false) {
     if (t.status === 'selesai' || t.status === 'gagal') break;
     tampil(t.status === 'antre' && t.posisi > 1 ? `Antre, posisi ${t.posisi}. ${t.langkah}` : t.langkah);
   }
-  delete tugasAgen[kunci];
   if (t.status === 'selesai' && (jenis === 'periksa' || jenis === 'periksa-apify')) {
     const a = await ambilApp(userId);
     const h = t.hasil;
@@ -897,6 +1058,8 @@ async function ikutiTugasAgen(jenis, userId, idt, diam = false) {
     }
     if (!diam) toast(`AI agent gagal: ${t.error || 'tidak diketahui'}`, 'gagal');
   }
+  // Penanda dilepas setelah hasil dan rangkuman akhir tersimpan, supaya daftar dan layar scan membaca data terbaru.
+  delete tugasAgen[kunci];
   if (location.hash === `#/admin/p/${userId}`) viewAdminDetail(userId);
   else if (location.hash === '#/admin') viewAdmin();
 }
@@ -980,7 +1143,7 @@ async function viewAdminDetail(userId) {
         </div>
         <p class="kecil"><b>Via Apify (tanpa Chrome).</b> Penyedia data Apify mengambil postingan terbaru beserta komentar terbaru, lalu Claude menilai foto, caption, dan komentar. Butuh token Apify di Pengaturan.</p>
         <div class="baris-tombol">
-          <button class="tombol" type="button" id="apifyAgen"${tugasAgen[`periksa-apify:${userId}`] ? ' disabled' : ''}>Periksa IG via Apify</button>
+          <button class="tombol" type="button" id="apifyAgen"${tugasAgen[`periksa-apify:${userId}`] ? ' disabled' : ''}>Scan IG via Apify</button>
           <span class="redup kecil" id="periksa-apifyLangkah">${tugasAgen[`periksa-apify:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
         </div>
         <p class="kecil"><b>Pantau tanpa login.</b> Tanpa akun dan tanpa browser: mengecek ulang ${postinganDikenal(a).length} postingan yang sudah dikenal lewat halaman publik, mendeteksi postingan terhapus, caption diubah, dan perubahan profil. Claude hanya dipanggil bila ada perubahan.</p>
@@ -1047,9 +1210,7 @@ async function viewAdminDetail(userId) {
     }
   };
   document.getElementById('periksaAgen')?.addEventListener('click', mulaiAgen('periksa', () => ({ username: s.instagram })));
-  document.getElementById('apifyAgen')?.addEventListener('click', mulaiAgen('periksa-apify', async () => ({
-    username: s.instagram, maks: Number((await AI.pengaturan()).apifyMaks) || 50,
-  })));
+  document.getElementById('apifyAgen')?.addEventListener('click', () => bukaPindai(userId));
   document.getElementById('pantauAgen')?.addEventListener('click', mulaiAgen('pantau', () => ({
     username: s.instagram,
     lama: postinganDikenal(a),
