@@ -25,6 +25,8 @@ python -m http.server 8000
 
 Lalu buka http://localhost:8000. Pada kunjungan pertama, buat akun admin. Sistem otomatis membuat 5 kode undangan.
 
+Versi online di Vercel: Root Directory `web-iqbal`, Framework "Other", tanpa build. Folder `agen/` tidak ikut diunggah (`.vercelignore`) dan halaman diberi `noindex`. Di sana data tetap per browser, dan fitur yang butuh `agen/server.py` (cek IG lewat agen, Apify, pantau) hanya jalan bila server agen hidup di komputer yang sama.
+
 ## Tampilan
 
 - Font Plus Jakarta Sans dimuat dari Google Fonts. Tanpa internet, tampilan jatuh ke font sistem.
