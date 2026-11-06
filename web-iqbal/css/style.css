@@ -423,14 +423,16 @@ fieldset.soal.kurang { border-color: var(--merah); box-shadow: 0 0 0 3px var(--m
 .statistik-kode { grid-template-columns: repeat(3, 1fr); }
 .ubin {
   background: var(--permukaan); border: 1px solid var(--garis); border-radius: var(--radius); padding: 14px 16px;
-  box-shadow: var(--bayang); border-top: 4px solid var(--garis-kuat);
+  box-shadow: var(--bayang);
 }
-.ubin span { display: block; font-size: .78rem; font-weight: 600; color: var(--redup); }
-.ubin b { display: block; font-size: 1.7rem; font-weight: 800; line-height: 1.2; }
-.ubin-emas { border-top-color: var(--emas); }
-.ubin-hijau { border-top-color: var(--hijau); } .ubin-hijau b { color: var(--hijau); }
-.ubin-kuning { border-top-color: var(--kuning); } .ubin-kuning b { color: var(--kuning); }
-.ubin-merah { border-top-color: var(--merah); } .ubin-merah b { color: var(--merah); }
+.ubin span { display: flex; align-items: center; gap: 7px; font-size: .78rem; font-weight: 600; color: var(--redup); }
+.ubin b { display: block; font-size: 1.7rem; font-weight: 800; line-height: 1.2; margin-top: 2px; }
+/* Warna kategori cukup lewat titik kecil di depan label; angkanya tetap warna teks biasa. */
+.ubin[class*="ubin-"] span::before { content: ""; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--titik); }
+.ubin-emas { --titik: var(--emas); }
+.ubin-hijau { --titik: var(--hijau); }
+.ubin-kuning { --titik: var(--kuning); }
+.ubin-merah { --titik: var(--merah); }
 
 .saring { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .saring button {
@@ -448,11 +450,7 @@ th { background: var(--permukaan-2); font-size: .74rem; font-weight: 700; text-t
 tr:last-child td { border-bottom: 0; }
 td.aksi { white-space: nowrap; text-align: right; }
 td.aksi .tombol + .tombol { margin-left: 6px; }
-.tabel-pendaftar tbody tr { box-shadow: inset 4px 0 0 var(--garis-kuat); }
 .tabel-pendaftar tbody tr:hover { background: var(--permukaan-2); }
-.tabel-pendaftar tr.baris-hijau { box-shadow: inset 4px 0 0 var(--hijau); }
-.tabel-pendaftar tr.baris-kuning { box-shadow: inset 4px 0 0 var(--kuning); }
-.tabel-pendaftar tr.baris-merah { box-shadow: inset 4px 0 0 var(--merah); }
 .tabel-pendaftar td:first-child a { text-decoration: none; color: var(--tinta); }
 .tabel-pendaftar td:first-child a:hover strong { color: var(--tautan); text-decoration: underline; }
 .temuan td { vertical-align: top; }
@@ -651,7 +649,6 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
     background: var(--permukaan); border: 1px solid var(--garis); border-radius: var(--radius);
     margin-bottom: 10px; padding: 6px 14px; box-shadow: var(--bayang);
   }
-  .tabel-kartu.tabel-pendaftar tbody tr { padding-left: 18px; }
   .tabel-kartu td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px dashed var(--garis); text-align: right; }
   .tabel-kartu td::before { content: attr(data-label); font-size: .74rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--redup); text-align: left; flex: none; }
   .tabel-kartu td > * { min-width: 0; }
@@ -712,9 +709,5 @@ summary { cursor: pointer; color: var(--tautan); font-weight: 600; }
 .pindai-langkah li.aktif::before { border-color: var(--emas); border-top-color: transparent; animation: putar .8s linear infinite; }
 .pindai-langkah li.selesai { color: var(--hijau); }
 .pindai-langkah li.selesai::before { content: "✓"; display: grid; place-items: center; font-size: .7rem; background: var(--hijau); border-color: var(--hijau); color: #fff; }
-.pindai-hasil { border-left: 5px solid var(--garis-kuat); padding-left: 14px; }
-.pindai-hasil.hasil-hijau { border-left-color: var(--hijau); }
-.pindai-hasil.hasil-kuning { border-left-color: var(--kuning); }
-.pindai-hasil.hasil-merah { border-left-color: var(--merah); }
 .pindai-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
 .pindai-status .lencana { font-size: 1rem; padding: 6px 14px; }
