@@ -281,6 +281,120 @@ Skema JSON:
     return json;
   }
 
+  // ---------- Cek IG via Apify, langsung dari browser (tanpa server agen) ----------
+
+  const INSTRUKSI_APIFY = `Kamu analis latar belakang untuk seleksi calon anggota Polri. Pendaftar sudah memberi persetujuan tertulis agar jejak digitalnya diperiksa.
+Kamu menerima postingan Instagram terbaru pendaftar dari penyedia data (Apify): foto asli (sampul dan hingga 2 slide carousel), caption, tanggal, jumlah suka, dan sebagian komentar terbaru beserta username pengomentarnya.
+Periksa indikasi: kekerasan atau senjata tajam, minuman keras, narkoba, perjudian (termasuk judi online), ujaran kebencian atau SARA, pornografi, hoaks atau provokasi, perundungan, gaya hidup mewah tidak wajar, balap liar, dan pelanggaran hukum atau etika lainnya.
+Penentuan status:
+- "hijau": tidak ditemukan indikasi negatif pada data yang tersedia.
+- "kuning": indikasi ringan atau ambigu, ATAU data terlalu sedikit untuk menilai.
+- "merah": indikasi kuat pelanggaran hukum atau etika berat, dengan bukti yang jelas.
+Setiap temuan WAJIB menyebut sumbernya: URL postingan persis seperti yang diberikan.
+Komentar dari akun lain bukan perilaku pendaftar; nilai hanya komentar yang ditulis akun pendaftar sendiri (ditandai PENDAFTAR), atau komentar orang lain bila jelas mengungkap perilaku pendaftar (sebutkan bahwa itu klaim orang lain).
+Video hanya terlihat sebagai gambar sampul; sebutkan itu di "keterbatasan" bila ada video.
+${ATURAN}
+Skema JSON:
+{"status":"hijau|kuning|merah","ringkasan":"2-4 kalimat","cakupan":"apa saja yang berhasil diperiksa","temuan":[{"kategori":"...","deskripsi":"...","sumber":"URL postingan","tingkat":"rendah|sedang|tinggi"}],"keterbatasan":"..."}`;
+  const MAKS_FOTO_APIFY = 90; // batas foto per permintaan Claude
+
+  // Actor apify/instagram-scraper, dijalankan sinkron (maks. ±5 menit). Format keluarannya bisa berubah antar versi,
+  // jadi setiap field dibaca dengan nilai cadangan.
+  async function postinganApify(token, username, maks) {
+    const url = 'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?timeout=280';
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directUrls: [`https://www.instagram.com/${username}/`], resultsType: 'posts', resultsLimit: maks, addParentData: false }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(res.status === 401 ? 'Token Apify tidak valid.' : `Apify ${res.status}: ${data?.error?.message || 'gagal'}`);
+    const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+    const hasil = [];
+    for (const it of items) {
+      if (!it || typeof it !== 'object') continue;
+      // Mis. akun private, tidak ditemukan, atau tanpa postingan.
+      if (it.error) throw new Error(`Apify: ${it.errorDescription || it.error}`);
+      const urlPost = it.url || (it.shortCode ? `https://www.instagram.com/p/${it.shortCode}/` : null);
+      if (!urlPost) continue;
+      const gambar = [it.displayUrl, ...(it.images || []).filter(g => typeof g === 'string' && g !== it.displayUrl)].filter(Boolean);
+      hasil.push({
+        url: urlPost,
+        tanggal: it.timestamp || null,
+        caption: it.caption || '',
+        jenis: it.type || null, // Image / Video / Sidecar
+        suka: it.likesCount,
+        jumlahKomentar: it.commentsCount,
+        lokasi: it.locationName || null,
+        gambar: gambar.slice(0, 3), // foto sampul + maks. 2 slide carousel
+        komentar: (it.latestComments || []).filter(c => c?.text).slice(0, 20).map(c => ({ oleh: c.ownerUsername, teks: c.text })),
+      });
+    }
+    return hasil;
+  }
+
+  // Foto IG diunduh browser lalu diperkecil (maks. 800 px) supaya puluhan foto muat dalam satu permintaan Claude.
+  async function fotoBase64(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const bmp = await createImageBitmap(await res.blob());
+    const skala = Math.min(1, 800 / Math.max(bmp.width, bmp.height));
+    const kanvas = document.createElement('canvas');
+    kanvas.width = Math.round(bmp.width * skala);
+    kanvas.height = Math.round(bmp.height * skala);
+    kanvas.getContext('2d').drawImage(bmp, 0, 0, kanvas.width, kanvas.height);
+    return kanvas.toDataURL('image/jpeg', 0.82).split(',')[1];
+  }
+
+  // laporan(teks): progres untuk layar Scan. Hasilnya berbentuk sama dengan hasil agen/server.py.
+  async function periksaApify(username, maks, laporan = () => {}) {
+    const st = await pengaturan();
+    if (!st.apifyToken) throw new Error('Token Apify belum diisi di Pengaturan.');
+    if (!st.apiKey) throw new Error('API key Claude belum diisi di Pengaturan.');
+    laporan(`Apify mengambil maks. ${maks} postingan @${username}`);
+    const postingan = await postinganApify(st.apifyToken, username, maks);
+    if (!postingan.length) {
+      return {
+        mode: 'apify', model: null, postingan: [],
+        data: { status: 'kuning', ringkasan: `Apify tidak menemukan postingan untuk @${username}.`, cakupan: 'Halaman profil.', temuan: [],
+          keterbatasan: 'Akun mungkin private, tidak punya postingan, atau username salah.' },
+      };
+    }
+
+    const content = [{ type: 'text', text: `Akun Instagram pendaftar: @${username}\nJumlah postingan yang diambil: ${postingan.length} (terbaru lebih dulu).` }];
+    let jumlahFoto = 0;
+    for (const [i, p] of postingan.entries()) {
+      laporan(`Mengunduh foto postingan ${i + 1} dari ${postingan.length}`);
+      const komentar = p.komentar.map(k => `  - ${String(k.oleh || '').toLowerCase() === username.toLowerCase() ? 'PENDAFTAR' : `@${k.oleh}`}: ${k.teks}`).join('\n') || '  (tidak ada)';
+      content.push({ type: 'text', text: `\nPostingan ${i + 1}: ${p.url}\nTanggal: ${p.tanggal || '-'}\nJenis: ${p.jenis || '-'}\nSuka: ${p.suka}, komentar: ${p.jumlahKomentar}\nLokasi: ${p.lokasi || '-'}\nCaption: ${p.caption || '(kosong)'}\nKomentar terbaru:\n${komentar}` });
+      for (const [k, urlFoto] of p.gambar.entries()) {
+        if (jumlahFoto >= MAKS_FOTO_APIFY) break;
+        let data;
+        try { data = await fotoBase64(urlFoto); } catch { continue; } // foto gagal diunduh: lewati, postingan tetap dinilai dari teksnya
+        content.push({ type: 'text', text: `Foto postingan ${i + 1}, slide ${k + 1}:` });
+        content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } });
+        jumlahFoto++;
+      }
+    }
+
+    laporan(`Claude menilai ${postingan.length} postingan (${jumlahFoto} foto)`);
+    const { json } = await panggil(st, { instructions: INSTRUKSI_APIFY, content });
+    return {
+      mode: 'apify', model: st.model, jumlahFoto,
+      postingan: postingan.map(p => ({ url: p.url, tanggal: p.tanggal, caption: p.caption })),
+      data: {
+        status: statusValid(json.status),
+        ringkasan: String(json.ringkasan || ''),
+        cakupan: String(json.cakupan || ''),
+        temuan: Array.isArray(json.temuan) ? json.temuan.map(t => ({
+          kategori: String(t.kategori || ''), deskripsi: String(t.deskripsi || ''), sumber: String(t.sumber || ''),
+          tingkat: ['rendah', 'sedang', 'tinggi'].includes(t.tingkat) ? t.tingkat : 'sedang',
+        })) : [],
+        keterbatasan: String(json.keterbatasan || ''),
+      },
+    };
+  }
+
   // ---------- Agen IG (demo, server lokal agen/server.py) ----------
 
   // GET bila isi tidak diberikan, POST JSON bila ada. API key dan model ikut dikirim agar agen memakai pengaturan yang sama.
@@ -306,5 +420,5 @@ Skema JSON:
     return data;
   }
 
-  return { pengaturan, psikotes, sosmed, akhir, tesKoneksi, agen };
+  return { pengaturan, psikotes, sosmed, akhir, tesKoneksi, periksaApify, agen };
 })();

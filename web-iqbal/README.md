@@ -25,7 +25,7 @@ python -m http.server 8000
 
 Lalu buka http://localhost:8000. Pada kunjungan pertama, buat akun admin. Sistem otomatis membuat 5 kode undangan.
 
-Versi online di Vercel: Root Directory `web-iqbal`, Framework "Other", tanpa build. Folder `agen/` tidak ikut diunggah (`.vercelignore`) dan halaman diberi `noindex`. Di sana data tetap per browser, dan fitur yang butuh `agen/server.py` (cek IG lewat agen, Apify, pantau) hanya jalan bila server agen hidup di komputer yang sama.
+Versi online di Vercel: Root Directory `web-iqbal`, Framework "Other", tanpa build. Folder `agen/` tidak ikut diunggah (`.vercelignore`) dan halaman diberi `noindex`. Di sana data tetap per browser. Cek IG via Apify (tombol Scan, Cek semua, cek otomatis) berjalan langsung dari browser dengan token Apify dan API key Claude di Pengaturan, jadi tab harus tetap terbuka sampai selesai. Fitur agen Chrome dan pantau tanpa login tetap butuh `agen/server.py` di komputer yang sama.
 
 ## Tampilan
 

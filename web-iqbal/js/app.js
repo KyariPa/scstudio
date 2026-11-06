@@ -898,7 +898,7 @@ async function bukaPindai(userId) {
   if (!idt) {
     try {
       const maks = Number((await AI.pengaturan()).apifyMaks) || 50;
-      ({ id: idt } = await AI.agen('/periksa-apify', { username, maks }));
+      idt = mulaiApifyLokal(username, maks);
       tugasAgen[`periksa-apify:${userId}`] = idt;
       ikutiTugasAgen('periksa-apify', userId, idt, true);
     } catch (err) {
@@ -910,7 +910,7 @@ async function bukaPindai(userId) {
     await new Promise(r => setTimeout(r, 1200));
     if (!document.body.contains(layar)) return; // ditutup admin; tugas tetap jalan di latar
     let t;
-    try { t = await AI.agen(`/tugas/${idt}`); } catch { continue; }
+    try { t = await bacaTugas(idt); } catch { continue; }
     if (t.status === 'gagal') return galat(`Pemindaian gagal: ${t.error || 'tidak diketahui'}`);
     if (t.status === 'selesai') break;
     const l = t.langkah || '';
@@ -948,20 +948,55 @@ async function bukaPindai(userId) {
 // Masukkan akun IG ke antrean Apify. diam = true: tanpa notifikasi (dipakai di sisi pendaftar,
 // yang tidak perlu tahu kapan akunnya diperiksa, dan pada cek otomatis).
 async function antrekanCekIG(daftar, diam = false) {
-  const maks = Number((await AI.pengaturan()).apifyMaks) || 50;
-  let jalan = 0;
-  for (const { userId, instagram } of daftar) {
-    try {
-      const { id } = await AI.agen('/periksa-apify', { username: instagram, maks });
-      tugasAgen[`periksa-apify:${userId}`] = id;
-      ikutiTugasAgen('periksa-apify', userId, id, diam);
-      jalan++;
-    } catch (err) {
-      if (!diam) toast(err.message, 'gagal');
-      break;
-    }
+  const st = await AI.pengaturan();
+  if (!st.apifyToken || !st.apiKey) {
+    if (!diam) toast(`Isi ${st.apifyToken ? 'API key Claude' : 'token Apify'} di Pengaturan dulu.`, 'gagal');
+    return 0;
   }
-  return jalan;
+  const maks = Number(st.apifyMaks) || 50;
+  for (const { userId, instagram } of daftar) {
+    const id = mulaiApifyLokal(instagram, maks);
+    tugasAgen[`periksa-apify:${userId}`] = id;
+    ikutiTugasAgen('periksa-apify', userId, id, diam);
+  }
+  return daftar.length;
+}
+
+// Cek Apify berjalan di browser ini, tanpa server agen. Tugasnya disimpan di sini dan dibaca seperti tugas agen
+// (status, langkah, hasil), maksimal dua sekaligus supaya batas Apify dan Claude tidak terlampaui.
+// Tab harus tetap terbuka sampai selesai.
+const tugasLokal = {};
+const antreLokal = [];
+let lokalJalan = 0;
+
+function mulaiApifyLokal(username, maks) {
+  const id = `lokal-${idAcak()}`;
+  const t = tugasLokal[id] = { status: 'antre', langkah: 'Menunggu giliran', posisi: antreLokal.length + 1 };
+  antreLokal.push(async () => {
+    t.status = 'berjalan';
+    try {
+      t.hasil = await AI.periksaApify(username, maks, l => { t.langkah = l; });
+      Object.assign(t, { status: 'selesai', langkah: 'Selesai' });
+    } catch (err) {
+      Object.assign(t, { status: 'gagal', langkah: 'Gagal', error: err.message });
+    }
+  });
+  jalankanLokal();
+  return id;
+}
+
+function jalankanLokal() {
+  while (lokalJalan < 2 && antreLokal.length) {
+    const kerja = antreLokal.shift();
+    lokalJalan++;
+    kerja().finally(() => { lokalJalan--; jalankanLokal(); });
+  }
+  Object.values(tugasLokal).filter(t => t.status === 'antre').forEach((t, i) => { t.posisi = i + 1; });
+}
+
+// Tugas lokal dibaca dari memori; tugas lain (agen Chrome, pantau) dari server agen.
+async function bacaTugas(idt) {
+  return tugasLokal[idt] ? { ...tugasLokal[idt] } : AI.agen(`/tugas/${idt}`);
 }
 
 function blokGagal(h, jenis) {
@@ -1021,7 +1056,7 @@ async function ikutiTugasAgen(jenis, userId, idt, diam = false) {
   for (;;) {
     await new Promise(r => setTimeout(r, 3000));
     try {
-      t = await AI.agen(`/tugas/${idt}`);
+      t = await bacaTugas(idt);
     } catch (err) {
       tampil(err.message);
       continue; // agen mungkin sedang dimulai ulang; coba lagi
@@ -1344,7 +1379,7 @@ async function viewPengaturan() {
       <form id="fApify">
         <label>Token API Apify <span class="redup">(console.apify.com → Settings → API & Integrations)</span>
           <input name="apifyToken" type="password" value="${esc(st.apifyToken)}" placeholder="apify_api_..." autocomplete="off" spellcheck="false"></label>
-        <p class="peringatan kecil">Token disimpan di browser ini saja dan hanya dikirim ke agen lokal, yang meneruskannya ke Apify. Jangan menaruh token di kode atau commit ke GitHub.</p>
+        <p class="peringatan kecil">Token disimpan di browser ini saja dan hanya dikirim langsung ke Apify. Cek berjalan di tab ini, jadi biarkan tab terbuka sampai selesai. Jangan menaruh token di kode atau commit ke GitHub.</p>
         <label>Maksimal postingan per akun<input name="apifyMaks" type="number" min="1" max="200" value="${esc(st.apifyMaks)}"></label>
         <label class="centang"><input type="checkbox" name="apifyOtomatis" ${st.apifyOtomatis ? 'checked' : ''}> Cek IG otomatis via Apify: pendaftar baru langsung dicek, dan yang belum dicek masuk antrean saat daftar pendaftar dibuka</label>
         <button class="tombol">Simpan</button>
