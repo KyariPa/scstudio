@@ -298,18 +298,46 @@ Skema JSON:
 {"status":"hijau|kuning|merah","ringkasan":"2-4 kalimat","cakupan":"apa saja yang berhasil diperiksa","temuan":[{"kategori":"...","deskripsi":"...","sumber":"URL postingan","tingkat":"rendah|sedang|tinggi"}],"keterbatasan":"..."}`;
   const MAKS_FOTO_APIFY = 90; // batas foto per permintaan Claude
 
-  // Actor apify/instagram-scraper, dijalankan sinkron (maks. ±5 menit). Format keluarannya bisa berubah antar versi,
-  // jadi setiap field dibaca dengan nilai cadangan.
-  async function postinganApify(token, username, maks) {
-    const url = 'https://api.apify.com/v2/acts/apify~instagram-scraper/run-sync-get-dataset-items?timeout=280';
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ directUrls: [`https://www.instagram.com/${username}/`], resultsType: 'posts', resultsLimit: maks, addParentData: false }),
-    });
+  const API_APIFY = 'https://api.apify.com/v2';
+  const AKTOR_IG = 'apify~instagram-scraper';
+  const SIMPAN_APIFY_HARI = 7; // masa simpan dataset di paket Free Apify
+
+  async function apifyJson(token, jalur, opsi = {}) {
+    const res = await fetch(API_APIFY + jalur, { ...opsi, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error(res.status === 401 ? 'Token Apify tidak valid.' : `Apify ${res.status}: ${data?.error?.message || 'gagal'}`);
-    const items = Array.isArray(data) ? data : (data?.items || data?.data || []);
+    return data;
+  }
+
+  // Hasil scraping akun ini yang masih tersimpan di akun Apify (run sukses dalam 7 hari terakhir), supaya akun yang
+  // sudah pernah diambil tidak di-scrape dan ditagih ulang. Input tiap run dibaca dari record INPUT-nya.
+  async function datasetApifyTersimpan(token, username, maks) {
+    const batas = Date.now() - SIMPAN_APIFY_HARI * 864e5;
+    const daftar = await apifyJson(token, `/acts/${AKTOR_IG}/runs?desc=1&limit=50&status=SUCCEEDED`);
+    const runs = (daftar?.data?.items || []).filter(r => Date.parse(r.finishedAt || r.startedAt) > batas);
+    const target = `instagram.com/${username.toLowerCase()}`;
+    const cocok = await Promise.all(runs.map(async r => {
+      const input = await apifyJson(token, `/key-value-stores/${r.defaultKeyValueStoreId}/records/INPUT`).catch(() => null);
+      const urls = (input?.directUrls || []).map(u => String(u).toLowerCase().replace(/\/+$/, ''));
+      return input?.resultsType === 'posts' && urls.some(u => u.endsWith(target)) ? r : null;
+    }));
+    const run = cocok.find(Boolean); // daftar sudah urut terbaru lebih dulu
+    if (!run) return null;
+    const items = await apifyJson(token, `/datasets/${run.defaultDatasetId}/items?clean=true&format=json&limit=${maks}`);
+    return { items: Array.isArray(items) ? items : [], waktu: run.finishedAt || run.startedAt };
+  }
+
+  // Actor apify/instagram-scraper, dijalankan sinkron (maks. ±5 menit).
+  async function scrapeApify(token, username, maks) {
+    const data = await apifyJson(token, `/acts/${AKTOR_IG}/run-sync-get-dataset-items?timeout=280`, {
+      method: 'POST',
+      body: JSON.stringify({ directUrls: [`https://www.instagram.com/${username}/`], resultsType: 'posts', resultsLimit: maks, addParentData: false }),
+    });
+    return Array.isArray(data) ? data : (data?.items || data?.data || []);
+  }
+
+  // Format keluaran actor bisa berubah antar versi, jadi setiap field dibaca dengan nilai cadangan.
+  function uraiPostinganApify(items) {
     const hasil = [];
     for (const it of items) {
       if (!it || typeof it !== 'object') continue;
@@ -347,15 +375,22 @@ Skema JSON:
   }
 
   // laporan(teks): progres untuk layar Scan. Hasilnya berbentuk sama dengan hasil agen/server.py.
-  async function periksaApify(username, maks, laporan = () => {}) {
+  // baru = true: selalu scrape ulang dari Instagram walau data lama masih tersimpan di Apify.
+  async function periksaApify(username, maks, laporan = () => {}, { baru = false } = {}) {
     const st = await pengaturan();
     if (!st.apifyToken) throw new Error('Token Apify belum diisi di Pengaturan.');
     if (!st.apiKey) throw new Error('API key Claude belum diisi di Pengaturan.');
-    laporan(`Apify mengambil maks. ${maks} postingan @${username}`);
-    const postingan = await postinganApify(st.apifyToken, username, maks);
+    let tersimpan = null;
+    if (!baru) {
+      laporan(`Apify mengambil data tersimpan @${username}`);
+      tersimpan = await datasetApifyTersimpan(st.apifyToken, username, maks).catch(() => null);
+    }
+    if (!tersimpan) laporan(`Apify mengambil maks. ${maks} postingan @${username}`);
+    const postingan = uraiPostinganApify(tersimpan ? tersimpan.items : await scrapeApify(st.apifyToken, username, maks));
+    const sumberData = tersimpan ? { dariSimpanan: true, waktuData: tersimpan.waktu } : { dariSimpanan: false, waktuData: new Date().toISOString() };
     if (!postingan.length) {
       return {
-        mode: 'apify', model: null, postingan: [],
+        mode: 'apify', model: null, postingan: [], ...sumberData,
         data: { status: 'kuning', ringkasan: `Apify tidak menemukan postingan untuk @${username}.`, cakupan: 'Halaman profil.', temuan: [],
           keterbatasan: 'Akun mungkin private, tidak punya postingan, atau username salah.' },
       };
@@ -380,7 +415,7 @@ Skema JSON:
     laporan(`Claude menilai ${postingan.length} postingan (${jumlahFoto} foto)`);
     const { json } = await panggil(st, { instructions: INSTRUKSI_APIFY, content });
     return {
-      mode: 'apify', model: st.model, jumlahFoto,
+      mode: 'apify', model: st.model, jumlahFoto, ...sumberData,
       postingan: postingan.map(p => ({ url: p.url, tanggal: p.tanggal, caption: p.caption })),
       data: {
         status: statusValid(json.status),

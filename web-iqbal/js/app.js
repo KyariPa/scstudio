@@ -772,7 +772,7 @@ async function viewAdmin() {
       <td data-label="Tahap"><span class="chip ${kelasTahap(a)}">${esc(teksTahap(a))}</span></td>
       <td data-label="Psikotes">${a?.psikotes?.dikirim ? `<b>${a.psikotes.total}%</b>` : '<span class="redup">-</span>'}</td>
       <td data-label="Sosmed">${lencana(a?.aiSosmed?.data?.status)}</td>
-      <td data-label="Cek IG"><span class="chip ${s.kelas}">${esc(s.teks)}</span>${['tanpa', 'jalan'].includes(s.kode) ? '' : ` <button type="button" class="tombol tombol-tipis tombol-scan" data-scan="${u.id}">Scan</button>`}</td>
+      <td data-label="Cek IG"><span class="chip ${s.kelas}">${esc(s.teks)}</span>${['tanpa', 'jalan', 'sudah'].includes(s.kode) ? '' : ` <button type="button" class="tombol tombol-tipis tombol-scan" data-scan="${u.id}">Scan</button>`}</td>
       <td data-label="Akhir">${lencana(a?.aiAkhir?.data?.status)}</td>
     </tr>`;
   }).join('');
@@ -849,7 +849,8 @@ async function viewAdmin() {
 // lalu berganti menjadi rangkuman lengkap. Hanya akun ini yang dicek, walau cek otomatis sedang nonaktif.
 const LANGKAH_PINDAI = ['Mengambil postingan', 'Membaca foto & komentar', 'AI menilai konten', 'Menyusun rangkuman'];
 
-async function bukaPindai(userId) {
+// baru = true: scrape ulang dari Instagram walau data lama masih tersimpan di Apify.
+async function bukaPindai(userId, { baru = false } = {}) {
   const u = await DB.get('users', userId);
   const a = await ambilApp(userId);
   const username = a.sosmed?.instagram || '';
@@ -898,7 +899,7 @@ async function bukaPindai(userId) {
   if (!idt) {
     try {
       const maks = Number((await AI.pengaturan()).apifyMaks) || 50;
-      idt = mulaiApifyLokal(username, maks);
+      idt = mulaiApifyLokal(username, maks, { baru });
       tugasAgen[`periksa-apify:${userId}`] = idt;
       ikutiTugasAgen('periksa-apify', userId, idt, true);
     } catch (err) {
@@ -933,6 +934,7 @@ async function bukaPindai(userId) {
   isi.innerHTML = `
     <div class="pindai-hasil hasil-${esc(so?.data?.status || 'kuning')}">
       <div class="pindai-status">${lencana(so?.data?.status)} <span class="redup kecil">${so?.postingan?.length || 0} postingan · ${labelMode(so)}</span></div>
+      ${so?.dariSimpanan ? `<p class="redup kecil">Memakai data Apify tersimpan dari ${esc(tglPendek(so.waktuData))}, tanpa scraping ulang.</p>` : ''}
       <p>${esc(so?.data?.ringkasan || '')}</p>
       ${daftarTemuan(so?.data?.temuan || [])}
       ${ak?.status === 'ok' ? `<div class="kotak-info"><p><b>Rangkuman akhir:</b> ${lencana(ak.data.status)}<br>${esc(ak.data.ringkasan)}</p></div>` : ''}
@@ -969,13 +971,13 @@ const tugasLokal = {};
 const antreLokal = [];
 let lokalJalan = 0;
 
-function mulaiApifyLokal(username, maks) {
+function mulaiApifyLokal(username, maks, opsi = {}) {
   const id = `lokal-${idAcak()}`;
   const t = tugasLokal[id] = { status: 'antre', langkah: 'Menunggu giliran', posisi: antreLokal.length + 1 };
   antreLokal.push(async () => {
     t.status = 'berjalan';
     try {
-      t.hasil = await AI.periksaApify(username, maks, l => { t.langkah = l; });
+      t.hasil = await AI.periksaApify(username, maks, l => { t.langkah = l; }, opsi);
       Object.assign(t, { status: 'selesai', langkah: 'Selesai' });
     } catch (err) {
       Object.assign(t, { status: 'gagal', langkah: 'Gagal', error: err.message });
@@ -1071,7 +1073,8 @@ async function ikutiTugasAgen(jenis, userId, idt, diam = false) {
   if (t.status === 'selesai' && (jenis === 'periksa' || jenis === 'periksa-apify')) {
     const a = await ambilApp(userId);
     const h = t.hasil;
-    a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: h.mode, model: h.model, postingan: h.postingan, data: h.data };
+    a.aiSosmed = { status: 'ok', waktu: sekarang(), mode: h.mode, model: h.model, postingan: h.postingan, data: h.data,
+      ...(h.waktuData ? { dariSimpanan: h.dariSimpanan, waktuData: h.waktuData } : {}) };
     delete a.cekIGGagal;
     await simpanApp(a);
     await analisisAkhirJikaSiap(userId);
@@ -1169,6 +1172,7 @@ async function viewAdminDetail(userId) {
         <p><b>Yang diperiksa:</b> ${esc(so.data.cakupan)}</p>
         ${daftarTemuan(so.data.temuan)}
         <p><b>Keterbatasan:</b> ${esc(so.data.keterbatasan)}</p>
+        ${so.dariSimpanan ? `<p class="redup kecil">Memakai data Apify tersimpan dari ${esc(tglPendek(so.waktuData))}, tanpa scraping ulang.</p>` : ''}
         ${so.postingan?.length ? `<details><summary>Postingan yang dibaca agen (${so.postingan.length})</summary><ul>${so.postingan.map(p => `<li class="pecah"><a href="${/^https:\/\/www\.instagram\.com\//.test(p.url) ? esc(p.url) : '#'}" target="_blank" rel="noopener noreferrer">${p.tanggal ? tgl(p.tanggal) : 'Postingan'}</a>${p.caption ? `: ${esc(p.caption)}` : ''}</li>`).join('')}</ul></details>` : ''}
         ${so.sumber?.length ? `<details><summary>Sumber web yang ditelusuri AI (${so.sumber.length})</summary><ul>${so.sumber.map(x => `<li class="pecah">${/^https?:\/\//.test(x.url) ? `<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.judul)}</a>` : esc(x.judul)}</li>`).join('')}</ul></details>` : ''}`}
       <p class="redup kecil">Verifikasi sendiri setiap temuan sebelum mengambil keputusan. Username yang sama bisa dipakai orang lain.</p>
@@ -1180,9 +1184,10 @@ async function viewAdminDetail(userId) {
           <button class="tombol" type="button" id="periksaAgen"${tugasAgen[`periksa:${userId}`] ? ' disabled' : ''}>Periksa IG dengan AI agent</button>
           <span class="redup kecil" id="periksaLangkah">${tugasAgen[`periksa:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
         </div>` : ''}
-        <p class="kecil"><b>Via Apify (tanpa Chrome).</b> Penyedia data Apify mengambil postingan terbaru beserta komentar terbaru, lalu Claude menilai foto, caption, dan komentar. Butuh token Apify di Pengaturan.</p>
+        <p class="kecil"><b>Via Apify (tanpa Chrome).</b> Penyedia data Apify mengambil postingan terbaru beserta komentar terbaru, lalu Claude menilai foto, caption, dan komentar. Bila akun ini sudah pernah diambil dalam 7 hari terakhir, Scan memakai data yang tersimpan di Apify (tanpa biaya scraping lagi); "Ambil ulang" selalu mengambil data baru. Butuh token Apify di Pengaturan.</p>
         <div class="baris-tombol">
           <button class="tombol" type="button" id="apifyAgen"${tugasAgen[`periksa-apify:${userId}`] ? ' disabled' : ''}>Scan IG via Apify</button>
+          <button class="tombol tombol-tipis" type="button" id="apifyBaru"${tugasAgen[`periksa-apify:${userId}`] ? ' disabled' : ''}>Ambil ulang dari Instagram</button>
           <span class="redup kecil" id="periksa-apifyLangkah">${tugasAgen[`periksa-apify:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
         </div>${AGEN_LOKAL ? `
         <p class="kecil"><b>Pantau tanpa login.</b> Tanpa akun dan tanpa browser: mengecek ulang ${postinganDikenal(a).length} postingan yang sudah dikenal lewat halaman publik, mendeteksi postingan terhapus, caption diubah, dan perubahan profil. Claude hanya dipanggil bila ada perubahan.</p>
@@ -1250,6 +1255,7 @@ async function viewAdminDetail(userId) {
   };
   document.getElementById('periksaAgen')?.addEventListener('click', mulaiAgen('periksa', () => ({ username: s.instagram })));
   document.getElementById('apifyAgen')?.addEventListener('click', () => bukaPindai(userId));
+  document.getElementById('apifyBaru')?.addEventListener('click', () => bukaPindai(userId, { baru: true }));
   document.getElementById('pantauAgen')?.addEventListener('click', mulaiAgen('pantau', () => ({
     username: s.instagram,
     lama: postinganDikenal(a),
