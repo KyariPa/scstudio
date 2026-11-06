@@ -1005,6 +1005,10 @@ function blokGagal(h, jenis) {
   return '';
 }
 
+// Agen Chrome dan pantau tanpa login butuh agen/server.py di komputer yang sama, jadi hanya ditampilkan saat web dibuka
+// dari localhost. Di versi online (Vercel) yang tersisa cek IG via Apify, yang berjalan langsung dari browser.
+const AGEN_LOKAL = ['localhost', '127.0.0.1'].includes(location.hostname);
+
 // Tugas agen IG yang sedang berjalan ("periksa:<userId>" / "pantau:<userId>" -> id tugas).
 // Pengikutan tugas tetap jalan walau admin pindah halaman.
 const tugasAgen = {};
@@ -1170,22 +1174,22 @@ async function viewAdminDetail(userId) {
       <p class="redup kecil">Verifikasi sendiri setiap temuan sebelum mengambil keputusan. Username yang sama bisa dipakai orang lain.</p>
       <button class="tombol tombol-tipis" data-ulang="sosmed">Analisis ulang media sosial</button>
       ${s.instagram ? `
-      <div class="kotak-agen">
+      <div class="kotak-agen">${AGEN_LOKAL ? `
         <p><b>AI agent Instagram (demo).</b> Agen membuka akun ${esc(s.instagram)} memakai akun IG panitia, membaca postingan terbaru, lalu Claude menilainya.</p>
         <div class="baris-tombol">
           <button class="tombol" type="button" id="periksaAgen"${tugasAgen[`periksa:${userId}`] ? ' disabled' : ''}>Periksa IG dengan AI agent</button>
           <span class="redup kecil" id="periksaLangkah">${tugasAgen[`periksa:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
-        </div>
+        </div>` : ''}
         <p class="kecil"><b>Via Apify (tanpa Chrome).</b> Penyedia data Apify mengambil postingan terbaru beserta komentar terbaru, lalu Claude menilai foto, caption, dan komentar. Butuh token Apify di Pengaturan.</p>
         <div class="baris-tombol">
           <button class="tombol" type="button" id="apifyAgen"${tugasAgen[`periksa-apify:${userId}`] ? ' disabled' : ''}>Scan IG via Apify</button>
           <span class="redup kecil" id="periksa-apifyLangkah">${tugasAgen[`periksa-apify:${userId}`] ? 'Sedang diperiksa...' : ''}</span>
-        </div>
+        </div>${AGEN_LOKAL ? `
         <p class="kecil"><b>Pantau tanpa login.</b> Tanpa akun dan tanpa browser: mengecek ulang ${postinganDikenal(a).length} postingan yang sudah dikenal lewat halaman publik, mendeteksi postingan terhapus, caption diubah, dan perubahan profil. Claude hanya dipanggil bila ada perubahan.</p>
         <div class="baris-tombol">
           <button class="tombol tombol-tipis" type="button" id="pantauAgen"${tugasAgen[`pantau:${userId}`] ? ' disabled' : ''}>Pantau tanpa login</button>
           <span class="redup kecil" id="pantauLangkah">${tugasAgen[`pantau:${userId}`] ? 'Sedang dipantau...' : ''}</span>
-        </div>
+        </div>` : ''}
       </div>` : ''}
       ${blokPantau(a.aiPantau)}`);
 
@@ -1360,7 +1364,7 @@ async function viewPengaturan() {
           <button class="tombol tombol-tipis" type="button" id="tes">Tes koneksi</button>
         </div>
       </form>
-    </section>
+    </section>${AGEN_LOKAL ? `
     <section class="kartu">
       <h2>AI agent Instagram (demo)</h2>
       <p class="redup">Server kecil di PC ini (<code>python agen/server.py</code>) membuka Instagram memakai akun panitia, lalu membaca postingan pendaftar untuk dinilai Claude. Hanya untuk demo: akses otomatis dengan akun login melanggar aturan Meta dan akun bisa dibatasi.</p>
@@ -1372,7 +1376,7 @@ async function viewPengaturan() {
         <button class="tombol" type="button" id="loginAgen">Login Instagram agen</button>
         <button class="tombol tombol-tipis" type="button" id="cekAgen">Cek status</button>
       </div>
-    </section>
+    </section>` : ''}
     <section class="kartu">
       <h2>Apify (penyedia data, tanpa Chrome)</h2>
       <p class="redup">Apify mengambil postingan dan komentar terbaru akun public, jadi pemeriksaan tidak butuh Chrome maupun akun IG panitia. Paket Free memberi kredit $5 per bulan; satu postingan kira-kira $0,0027.</p>
@@ -1396,7 +1400,7 @@ async function viewPengaturan() {
     await DB.put('kv', {
       apiKey: f.get('apiKey').trim(), model: f.get('model').trim(),
       webSearch: f.get('webSearch') === 'on', tampilkanRingkasanKePendaftar: f.get('tampil') === 'on',
-      agenUrl: new FormData(document.getElementById('fAgen')).get('agenUrl').trim(),
+      agenUrl: document.getElementById('fAgen') ? new FormData(document.getElementById('fAgen')).get('agenUrl').trim() : st.agenUrl,
       apifyToken: new FormData(document.getElementById('fApify')).get('apifyToken').trim(),
       apifyMaks: Math.min(Math.max(Number(new FormData(document.getElementById('fApify')).get('apifyMaks')) || 50, 1), 200),
       apifyOtomatis: new FormData(document.getElementById('fApify')).get('apifyOtomatis') === 'on',
@@ -1415,8 +1419,8 @@ async function viewPengaturan() {
     }
   };
   cekAgen();
-  document.getElementById('cekAgen').addEventListener('click', async () => { await simpan(); cekAgen(); });
-  document.getElementById('loginAgen').addEventListener('click', async () => {
+  document.getElementById('cekAgen')?.addEventListener('click', async () => { await simpan(); cekAgen(); });
+  document.getElementById('loginAgen')?.addEventListener('click', async () => {
     await simpan();
     try {
       await AI.agen('/login', {});
